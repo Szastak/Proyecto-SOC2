@@ -1,0 +1,74 @@
+// ==============================================================================
+// Microsoft Sentinel Analytics Rule
+// Rule Name & ID: R02 - Credential Brute Force (Fuerza Bruta de Credenciales)
+// MITRE ATT&CK:
+//   - Tactic: Credential Access (TA0006)
+//   - Technique: T1110.001 (Brute Force: Password Guessing)
+// Severity: Medium
+// Data Source: SecurityEvent (Windows Security Event Log)
+//
+// Threshold:
+//   - Time Window: 10 minutes (ventana temporal de 10 minutos)
+//   - Failed Logons: >= 3 failed logon attempts (EventID 4625)
+//   - Target: Same user account from the same external IP address (par IpAddress, TargetUserName)
+//   - Source Address: External IP address (non-RFC1918, non-loopback)
+//
+// Python Equivalence:
+//   Mirrors `detections.py` constants:
+//     R2_FAILED_LOGONS_THRESHOLD = 3
+//     R2_TIME_WINDOW_MINUTES = 10
+//   Evaluates Event_ID == "4625" with is_external_ip == True grouped by [Source_IP, User]
+//   over a 10-minute sliding window checking for >= 3 failed logon attempts.
+//
+// Expected False Positives & Tuning Guidance:
+//   - Users who recently updated corporate domain passwords while mobile devices or
+//     cached credential managers (e.g., Outlook, Teams, VPN) keep attempting authentication.
+//   - Service accounts or scheduled tasks with stale passwords after a rotation cycle.
+//   - Tuning: Correlate with EventID 4740 (Account Lockout) or exclude legitimate VPN
+//     pool IP addresses if multi-factor authentication (MFA) is already strictly enforced.
+// ==============================================================================
+
+let timeframe = 1h;
+let lookbackWindow = 10m;
+let FailedLogonsThreshold = 3;
+SecurityEvent
+| where TimeGenerated >= ago(timeframe)
+| where EventID == 4625
+// Filtrar direcciones IP privadas (RFC 1918) y loopback
+| where isnotempty(IpAddress) and IpAddress !in ("-", "127.0.0.1", "::1", "0.0.0.0")
+| where ipv4_is_private(IpAddress) == false
+// Filtrar cuentas de máquina y entradas vacías
+| where isnotempty(TargetUserName) and TargetUserName !endswith "$" and TargetUserName != "-"
+// Agrupar por dirección IP externa, usuario objetivo y ventana temporal de 10 minutos
+| summarize
+    StartTime = min(TimeGenerated),
+    EndTime = max(TimeGenerated),
+    FailedAttemptsCount = count(),
+    TargetComputers = make_set(Computer, 10),
+    LogonTypes = make_set(LogonType, 5),
+    SubStatusCodes = make_set(SubStatus, 5),
+    ActivityList = make_set(Activity, 5)
+    by IpAddress, TargetUserName, bin(TimeGenerated, lookbackWindow)
+// Umbral idéntico a detections.py (>= 3 intentos fallidos)
+| where FailedAttemptsCount >= FailedLogonsThreshold
+| extend
+    RuleID = "R02",
+    RuleName = "Credential Brute Force",
+    TechniqueID = "T1110.001",
+    Tactic = "Credential Access",
+    Severity = "Medium"
+| project
+    StartTime,
+    EndTime,
+    RuleID,
+    RuleName,
+    TechniqueID,
+    Tactic,
+    Severity,
+    IpAddress,
+    TargetUserName,
+    FailedAttemptsCount,
+    TargetComputers,
+    LogonTypes,
+    SubStatusCodes,
+    ActivityList

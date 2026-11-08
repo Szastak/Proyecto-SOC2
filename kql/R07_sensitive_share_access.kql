@@ -1,0 +1,72 @@
+// ==============================================================================
+// Microsoft Sentinel Analytics Rule
+// Rule Name & ID: R07 - Sensitive Share Access (Acceso a Recursos Compartidos Sensibles)
+// MITRE ATT&CK:
+//   - Tactic: Collection (TA0009)
+//   - Techniques:
+//     - T1039: Data from Network Shared Drive
+//     - T1005: Data from Local System
+// Severity: High (si la cuenta presenta alertas previas o acceso detallado) / Medium
+// Data Source: SecurityEvent (Windows Event IDs 5140, 5145)
+//
+// Threshold:
+//   - Single occurrence (1 event) of network share access (EventID 5140) or detailed
+//     share object check (EventID 5145) where the ShareName or RelativeTargetName
+//     matches sensitive organizational keywords: Finance, Legal, HR, or Confidential.
+//
+// Python Equivalence:
+//   Mirrors `detections.py` constant:
+//     R7_SENSITIVE_REGEX = r"Finance|Legal|HR|Confidential"
+//   Evaluates Event_ID in ["5140", "5145"] matching R7_SENSITIVE_REGEX in Destination
+//   or Event_Description. Assigns Severity "Alto" if user in compromised_accounts
+//   or detailed access, otherwise "Medio". Technique = "T1039", Tactic = "Collection".
+//
+// Expected False Positives & Tuning Guidance:
+//   - Legitimate staff from Finance, Human Resources, or Legal departments accessing
+//     their daily departmental network repositories.
+//   - Enterprise backup software archiving file shares during maintenance windows.
+//   - Tuning: Whitelist authorized AD security groups associated with Finance/HR/Legal
+//     or alert only when accessed from non-standard subnets or outside business hours.
+// ==============================================================================
+
+let timeframe = 1h;
+let SensitiveRegex = @"(?i)(Finance|Legal|HR|Confidential)";
+// 1. Cuentas con actividad anómala o fallos previos
+let SuspiciousAccounts = SecurityEvent
+    | where TimeGenerated >= ago(2h)
+    | where EventID == 4625
+    | where isnotempty(TargetUserName) and TargetUserName !endswith "$"
+    | summarize FailedCount = count() by TargetUserName
+    | where FailedCount >= 3;
+// 2. Eventos de acceso a recursos compartidos (5140 / 5145)
+SecurityEvent
+| where TimeGenerated >= ago(timeframe)
+| where EventID in (5140, 5145)
+| extend SharePath = tostring(coalesce(ShareName, RelativeTargetName, ""))
+| extend AccessingUser = tostring(coalesce(SubjectUserName, Account, ""))
+| where isnotempty(SharePath)
+// Filtrar recursos por regex sensible
+| where SharePath matches regex SensitiveRegex or Activity matches regex SensitiveRegex
+| extend IsPriorCompromised = AccessingUser in (SuspiciousAccounts)
+| extend
+    RuleID = "R07",
+    RuleName = "Sensitive Network Share Access",
+    TechniqueID = "T1039",
+    Tactic = "Collection",
+    Severity = iff(IsPriorCompromised or EventID == 5145, "High", "Medium")
+| project
+    TimeGenerated,
+    RuleID,
+    RuleName,
+    TechniqueID,
+    Tactic,
+    Severity,
+    EventID,
+    AccessingUser,
+    Computer,
+    IpAddress,
+    ShareName,
+    RelativeTargetName,
+    SharePath,
+    AccessMask,
+    IsPriorCompromised

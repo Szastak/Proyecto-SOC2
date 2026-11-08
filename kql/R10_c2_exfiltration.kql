@@ -1,0 +1,65 @@
+// ==============================================================================
+// Microsoft Sentinel Analytics Rule
+// Rule Name & ID: R10 - Direct Outbound C2 Connection via Command Interpreters
+// MITRE ATT&CK:
+//   - Tactic: Command and Control (TA0011) / Exfiltration (TA0010)
+//   - Techniques:
+//     - T1041: Exfiltration Over C2 Channel
+//     - T1071.001: Web Protocols
+// Severity: High
+// Data Source: SecurityEvent (Event ID 5156 - Windows Filtering Platform Connection Permitted)
+//              o DeviceNetworkEvents (Microsoft Defender for Endpoint)
+//
+// Threshold:
+//   - Single occurrence (1 event) of an outbound network connection permitted to an
+//     external IP address initiated directly by a command interpreter (PowerShell or CMD).
+//
+// Python Equivalence:
+//   Mirrors `detections.py` R10 logic:
+//     r10_candidates = df_out[df_out["Event_ID"] == "5156"]
+//     if _is_external_ip(dest) and ("powershell" in cmd or "cmd" in cmd):
+//         event_rules.append("R10")
+//         event_severities.append("Alto")
+//         event_techniques.append("T1041")
+//         event_tactics.append("Command and Control")
+//
+// Expected False Positives & Tuning Guidance:
+//   - DevOps or IT administrator scripts running `Invoke-RestMethod`, `Invoke-WebRequest`,
+//     or `curl` against approved public cloud APIs (e.g., Azure Resource Manager, AWS, GitHub).
+//   - Package managers (e.g., Chocolatey, winget, NuGet) downloading tools via PowerShell.
+//   - Tuning: Whitelist sanctioned cloud IP prefixes or maintain a Sentinel Watchlist
+//     of approved destination FQDNs/IPs (`_GetWatchlist('ApprovedOutboundAPIs')`).
+// ==============================================================================
+
+let timeframe = 1h;
+SecurityEvent
+| where TimeGenerated >= ago(timeframe)
+| where EventID == 5156
+// Identificar aplicación/proceso originador
+| extend AppPath = tostring(coalesce(Application, ProcessName, ""))
+| where isnotempty(AppPath)
+| where AppPath matches regex @"(?i)(powershell(\.exe)?|cmd(\.exe)?)"
+// Filtrar destino: solo direcciones IP externas públicas
+| extend RemoteIP = tostring(coalesce(DestAddress, DestinationIP, ""))
+| where isnotempty(RemoteIP) and RemoteIP !in ("-", "127.0.0.1", "::1", "0.0.0.0")
+| where ipv4_is_private(RemoteIP) == false
+| extend
+    RuleID = "R10",
+    RuleName = "Direct C2 Outbound Connection via CLI",
+    TechniqueID = "T1041",
+    Tactic = "Command and Control",
+    Severity = "High"
+| project
+    TimeGenerated,
+    RuleID,
+    RuleName,
+    TechniqueID,
+    Tactic,
+    Severity,
+    Computer,
+    Application = AppPath,
+    DestAddress = RemoteIP,
+    DestPort,
+    SourceAddress = IpAddress,
+    SourcePort,
+    ProcessId = ProcessID

@@ -1,0 +1,90 @@
+// ==============================================================================
+// Microsoft Sentinel Analytics Rule
+// Rule Name & ID: R12 - Periodic C2 Beaconing Execution (Balizamiento Periódico C2)
+// MITRE ATT&CK:
+//   - Tactic: Command and Control (TA0011)
+//   - Technique: T1071.001 (Application Layer Protocol: Web Protocols)
+// Severity: High
+// Data Source: SecurityEvent (Event ID 4688 - Process Creation) / DeviceProcessEvents
+//
+// Threshold:
+//   - Executions: >= 4 executions (R12_MIN_EXECUTIONS = 4)
+//   - Jitter Ratio: Standard deviation of execution intervals / mean interval < 0.10 (Jitter < 10%)
+//   - Grouped by: Computer and Process CommandLine
+//   - Exclusions: svchost.exe, explorer.exe, taskhostw.exe, notepad.exe
+//
+// Python Equivalence:
+//   Mirrors `detections.py` constants:
+//     R12_MIN_EXECUTIONS = 4
+//     R12_MAX_JITTER_RATIO = 0.10
+//     R12_SYSTEM_PROCESS_EXCLUSIONS = ("svchost.exe", "explorer.exe", "taskhostw.exe", "notepad.exe")
+//   Evaluates Event_ID == "4688" grouped by [Hostname, Process_CommandLine].
+//   Calculates time differences between consecutive runs, computes std dev and mean.
+//   Triggers if std / mean < 0.10. Enriched with Severity "Alto", Technique "T1071.001",
+//   Tactic "Command and Control".
+//
+// Expected False Positives & Tuning Guidance:
+//   - High-frequency internal health checks or telemetry gathering scripts running on fixed timers.
+//   - Background performance counter gathering scripts.
+//   - Tuning: Add approved custom enterprise monitoring script names to the exclusion list
+//     or use a Sentinel Watchlist (`_GetWatchlist('ApprovedPeriodicTasks')`).
+// ==============================================================================
+
+let timeframe = 2h;
+let MinExecutions = 4;
+let MaxJitterRatio = 0.10; // Jitter máximo del 10%
+let ExcludedProcesses = dynamic(["svchost.exe", "explorer.exe", "taskhostw.exe", "notepad.exe"]);
+SecurityEvent
+| where TimeGenerated >= ago(timeframe)
+| where EventID == 4688
+| extend Command = tostring(coalesce(CommandLine, ""))
+| where isnotempty(Command)
+// Excluir procesos del sistema definidos en R12_SYSTEM_PROCESS_EXCLUSIONS
+| where not(Command has_any (ExcludedProcesses))
+// Ordenar temporalmente por host y línea de comandos para calcular intervalos sucesivos
+| order by Computer asc, Command asc, TimeGenerated asc
+| serialize
+| extend
+    PrevTime = prev(TimeGenerated),
+    PrevComputer = prev(Computer),
+    PrevCommand = prev(Command)
+// Validar que el intervalo pertenezca al mismo host y misma línea de comandos
+| where Computer == PrevComputer and Command == PrevCommand
+| extend DeltaSeconds = datetime_diff('second', TimeGenerated, PrevTime)
+| where DeltaSeconds > 0
+// Calcular métricas estadísticas de periodicidad e intervalos
+| summarize
+    ExecutionIntervals = count(),
+    StartTime = min(PrevTime),
+    EndTime = max(TimeGenerated),
+    AvgIntervalSeconds = avg(DeltaSeconds),
+    StdDevIntervalSeconds = stdev(DeltaSeconds),
+    SampleAccounts = make_set(SubjectUserName, 5)
+    by Computer, Command
+// Intervalos = Ejecuciones - 1; por tanto >= 3 intervalos equivale a >= 4 ejecuciones
+| where ExecutionIntervals >= (MinExecutions - 1)
+| extend JitterRatio = iff(AvgIntervalSeconds > 0, StdDevIntervalSeconds / AvgIntervalSeconds, 999.0)
+// Umbral idéntico a detections.py (Jitter < 10%)
+| where JitterRatio < MaxJitterRatio
+| extend
+    RuleID = "R12",
+    RuleName = "Periodic C2 Beaconing Execution",
+    TechniqueID = "T1071.001",
+    Tactic = "Command and Control",
+    Severity = "High",
+    TotalExecutions = ExecutionIntervals + 1
+| project
+    StartTime,
+    EndTime,
+    RuleID,
+    RuleName,
+    TechniqueID,
+    Tactic,
+    Severity,
+    Computer,
+    Command,
+    TotalExecutions,
+    AvgIntervalSeconds = round(AvgIntervalSeconds, 2),
+    StdDevIntervalSeconds = round(StdDevIntervalSeconds, 2),
+    JitterRatio = round(JitterRatio, 4),
+    SampleAccounts

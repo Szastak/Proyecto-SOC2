@@ -1,0 +1,85 @@
+// ==============================================================================
+// Microsoft Sentinel Analytics Rule
+// Rule Name & ID: R03 - Successful Logon Following Credential Attack (Compromiso de Cuenta)
+// MITRE ATT&CK:
+//   - Tactic: Initial Access (TA0001) / Defense Evasion (TA0005)
+//   - Technique: T1078 (Valid Accounts)
+// Severity: High
+// Data Source: SecurityEvent (Windows Security Event Log)
+//
+// Threshold:
+//   - Post-Attack Window: Successful logon within 30 minutes (<= 30 min) after
+//     prior brute force (R2: >=3 failures) or password spray (R1: >=10 failures/5 users)
+//   - Source Address: External IP address (non-RFC1918, non-loopback)
+//   - Event IDs: Correlates EventID 4625 (Failed Logon) with EventID 4624 (Successful Logon)
+//
+// Python Equivalence:
+//   Mirrors `detections.py` constant:
+//     R3_POST_ATTACK_WINDOW_MINUTES = 30
+//   Identifies attack IP windows from R1/R2 and correlates subsequent Event_ID 4624
+//   (Result == "Success") from the same Source_IP occurring between 0 and 30 minutes
+//   after the attack window ends. Marks user as compromised.
+//
+// Expected False Positives & Tuning Guidance:
+//   - Legitimate user entering incorrect password multiple times before entering the correct one.
+//   - Shared public egress NAT or proxy where multiple distinct remote users share an IP.
+//   - Tuning: Filter out known static corporate egress IPs. Verify if the compromised
+//     account was among the targeted users in the prior failed logon window.
+// ==============================================================================
+
+let timeframe = 2h;
+let postAttackWindow = 30m;
+// 1. Identificar IPs externas con actividad previa de fuerza bruta o spraying
+let AttackingExternalIPs = SecurityEvent
+    | where TimeGenerated >= ago(timeframe)
+    | where EventID == 4625
+    | where isnotempty(IpAddress) and IpAddress !in ("-", "127.0.0.1", "::1", "0.0.0.0")
+    | where ipv4_is_private(IpAddress) == false
+    | where isnotempty(TargetUserName) and TargetUserName !endswith "$" and TargetUserName != "-"
+    | summarize
+        AttackStartTime = min(TimeGenerated),
+        AttackEndTime = max(TimeGenerated),
+        FailedAttempts = count(),
+        TargetedUsers = make_set(TargetUserName, 50),
+        DistinctUsersCount = dcount(TargetUserName)
+        by IpAddress, bin(TimeGenerated, 15m)
+    // Coincide con umbral de R2 (>=3 fallos) o R1 (>=10 fallos y >=5 usuarios)
+    | where FailedAttempts >= 3;
+// 2. Identificar inicios de sesión exitosos desde direcciones IP externas
+let SuccessfulLogons = SecurityEvent
+    | where TimeGenerated >= ago(timeframe)
+    | where EventID == 4624
+    | where isnotempty(IpAddress) and IpAddress !in ("-", "127.0.0.1", "::1", "0.0.0.0")
+    | where ipv4_is_private(IpAddress) == false
+    | where isnotempty(TargetUserName) and TargetUserName !endswith "$" and TargetUserName != "-";
+// 3. Correlacionar temporalmente: éxito en ventana de 30 minutos tras el ataque
+AttackingExternalIPs
+| join kind=inner (
+    SuccessfulLogons
+) on IpAddress
+| extend DeltaMinutes = datetime_diff('minute', TimeGenerated1, AttackEndTime)
+| where DeltaMinutes between (0 .. 30)
+| extend
+    RuleID = "R03",
+    RuleName = "Successful Logon Following Credential Attack",
+    TechniqueID = "T1078",
+    Tactic = "Initial Access",
+    Severity = "High",
+    CompromisedUser = TargetUserName1
+| project
+    CompromiseTime = TimeGenerated1,
+    AttackStartTime,
+    AttackEndTime,
+    DeltaMinutes,
+    RuleID,
+    RuleName,
+    TechniqueID,
+    Tactic,
+    Severity,
+    IpAddress,
+    CompromisedUser,
+    LogonType = LogonType1,
+    DestinationComputer = Computer1,
+    FailedAttemptsPrior = FailedAttempts,
+    DistinctUsersTargetedPrior = DistinctUsersCount,
+    TargetedUsersListPrior = TargetedUsers

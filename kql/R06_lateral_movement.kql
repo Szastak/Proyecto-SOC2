@@ -1,0 +1,77 @@
+// ==============================================================================
+// Microsoft Sentinel Analytics Rule
+// Rule Name & ID: R06 - Lateral Movement via Network Logon and RDP (Movimiento Lateral)
+// MITRE ATT&CK:
+//   - Tactic: Lateral Movement (TA0008)
+//   - Techniques:
+//     - T1021.001: Remote Desktop Protocol (RDP)
+//     - T1021.002: SMB/Windows Admin Shares
+// Severity: High (para accesos exitosos) / Medium (para intentos fallidos)
+// Data Source: SecurityEvent (Windows Security Event Log)
+//
+// Threshold:
+//   - Case A (RDP - T1021.001): EventID 4624/4625 with LogonType 10 (RemoteInteractive)
+//     originating from an external IP address (non-RFC1918).
+//   - Case B (SMB - T1021.002): EventID 4624/4625 with LogonType 3 (Network) involving
+//     cross-workstation authentication or accounts with prior attack activity.
+//
+// Python Equivalence:
+//   Mirrors `detections.py` R6 logic:
+//     r6_candidates = df_out[df_out["Event_ID"].isin(["4624", "4625"])]
+//     - LogonType 10 from external IP -> T1021.001 (Lateral Movement)
+//     - LogonType 3 for compromised account or network source -> T1021.002 (Lateral Movement)
+//     - Result == "Success" -> Severity "Alto"; Result == "Failure" -> Severity "Medio"
+//
+// Expected False Positives & Tuning Guidance:
+//   - Authorized external contractors using direct RDP over allowed public IPs.
+//   - Legitimate administrative remote sessions without VPN.
+//   - Internal service accounts (e.g., vulnerability scanners or backup engines) logging
+//     into multiple workstations with LogonType 3.
+//   - Tuning: Whitelist internal management bastions and authorized VPN pools.
+//     Enforce MFA and conditional access on public RDP endpoints.
+// ==============================================================================
+
+let timeframe = 1h;
+// 1. Identificar cuentas previamente observadas en eventos de ataque
+let FlaggedAccounts = SecurityEvent
+    | where TimeGenerated >= ago(2h)
+    | where EventID == 4625
+    | where isnotempty(TargetUserName) and TargetUserName !endswith "$"
+    | summarize FailedCount = count() by TargetUserName
+    | where FailedCount >= 3;
+// 2. Eventos de inicio de sesión de red o RDP
+SecurityEvent
+| where TimeGenerated >= ago(timeframe)
+| where EventID in (4624, 4625)
+| where isnotempty(TargetUserName) and TargetUserName !endswith "$" and TargetUserName !in ("SYSTEM", "LOCAL SERVICE", "NETWORK SERVICE")
+| extend IsExternalIP = (isnotempty(IpAddress) and IpAddress !in ("-", "127.0.0.1", "::1", "0.0.0.0") and ipv4_is_private(IpAddress) == false)
+| extend LogonTypeStr = tostring(LogonType)
+// Caso 1: RDP desde el exterior (LogonType 10)
+| extend IsExternalRDP = (LogonTypeStr == "10" and IsExternalIP)
+// Caso 2: SMB / Red (LogonType 3)
+| extend IsSMBNetwork = (LogonTypeStr == "3" and (TargetUserName in (FlaggedAccounts) or isnotempty(WorkstationName)))
+| where IsExternalRDP or IsSMBNetwork
+| extend
+    RuleID = "R06",
+    RuleName = "Lateral Movement Detection",
+    TechniqueID = case(
+        IsExternalRDP, "T1021.001",
+        "T1021.002"
+    ),
+    Tactic = "Lateral Movement",
+    Severity = iff(EventID == 4624, "High", "Medium")
+| project
+    TimeGenerated,
+    RuleID,
+    RuleName,
+    TechniqueID,
+    Tactic,
+    Severity,
+    EventID,
+    LogonType,
+    TargetUserName,
+    Computer,
+    IpAddress,
+    WorkstationName,
+    ProcessName,
+    AuthenticationPackageName

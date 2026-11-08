@@ -1,0 +1,81 @@
+// ==============================================================================
+// Microsoft Sentinel Analytics Rule
+// Rule Name & ID: R09 - Mass Data Exfiltration via HTTP Proxy (Exfiltración Masiva por Proxy)
+// MITRE ATT&CK:
+//   - Tactic: Exfiltration (TA0010)
+//   - Techniques:
+//     - T1048.002: Exfiltration Over Asymmetric Encrypted Non-C2 Protocol
+//     - T1567: Exfiltration Over Web Service
+// Severity: High
+// Data Source: CommonSecurityLog (Proxy / Secure Web Gateway: Zscaler, Palo Alto, Squid, BlueCoat)
+//              o W3CIISLog / Custom Proxy Logs
+//
+// Threshold:
+//   - Time Window: 15 minutes (ventana temporal de 15 minutos)
+//   - HTTP Method: POST
+//   - Outbound Volume: Cumulative sent bytes >= 100 MB (104,857,600 bytes)
+//   - Grouped by: User and Destination (SourceUserID / DestinationHostName)
+//
+// Python Equivalence:
+//   Mirrors `detections.py` constants:
+//     R9_BYTES_OUT_THRESHOLD = 100 * 1024 * 1024  # 100 MB
+//     R9_TIME_WINDOW_MINUTES = 15
+//   Evaluates Event_ID == "PROXY_ACCESS" where method is POST, grouped by [User, Destination]
+//   over a 15-minute sliding window summing `bytes_out`. Triggers when sum >= 100 MB.
+//   Enriched with Severity "Alto", Technique "T1048.002", Tactic "Exfiltration".
+//
+// Expected False Positives & Tuning Guidance:
+//   - Legitimate bulk uploads of backups or VM images to corporate cloud storage (Azure Blob, AWS S3).
+//   - Developers pushing large container images or binaries to corporate artifact registries.
+//   - Video conferencing software streaming or uploading recordings.
+//   - Tuning: Whitelist sanctioned enterprise cloud storage domains and endpoints using
+//     a Sentinel Watchlist (`_GetWatchlist('SanctionedCloudStorage')`).
+// ==============================================================================
+
+let timeframe = 2h;
+let lookbackWindow = 15m;
+let ExfiltrationThresholdBytes = 100 * 1024 * 1024; // 100 MB = 104,857,600 bytes
+CommonSecurityLog
+| where TimeGenerated >= ago(timeframe)
+// Filtrar por método HTTP POST en registros de proxy / gateway web
+| where RequestMethod =~ "POST" or Activity has "POST"
+// Identificar usuario y destino
+| extend User = tostring(coalesce(SourceUserID, SourceUserName, SourceIP, "Unknown"))
+| extend Destination = tostring(coalesce(DestinationHostName, DestinationIP, RequestURL, "Unknown"))
+| extend OutboundBytes = tolong(coalesce(SentBytes, DeviceCustomNumber1, 0))
+| where OutboundBytes > 0
+// Agrupar por usuario, destino y ventana temporal de 15 minutos
+| summarize
+    StartTime = min(TimeGenerated),
+    EndTime = max(TimeGenerated),
+    TotalBytesSent = sum(OutboundBytes),
+    TotalPostRequests = count(),
+    SampleURLs = make_set(RequestURL, 10),
+    ClientIPs = make_set(SourceIP, 5),
+    UserAgents = make_set(RequestClientApplication, 5)
+    by User, Destination, bin(TimeGenerated, lookbackWindow)
+// Umbral idéntico a detections.py (>= 100 MB en 15 minutos)
+| where TotalBytesSent >= ExfiltrationThresholdBytes
+| extend
+    TotalMBSent = round(TotalBytesSent / (1024.0 * 1024.0), 2),
+    RuleID = "R09",
+    RuleName = "Mass Data Exfiltration via Proxy",
+    TechniqueID = "T1048.002",
+    Tactic = "Exfiltration",
+    Severity = "High"
+| project
+    StartTime,
+    EndTime,
+    RuleID,
+    RuleName,
+    TechniqueID,
+    Tactic,
+    Severity,
+    User,
+    Destination,
+    TotalMBSent,
+    TotalBytesSent,
+    TotalPostRequests,
+    SampleURLs,
+    ClientIPs,
+    UserAgents

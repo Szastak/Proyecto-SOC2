@@ -1,0 +1,129 @@
+// ==============================================================================
+// Microsoft Sentinel Analytics Rule
+// Rule Name & ID: R13 - Web Shell Execution and Malicious Web Probing
+// MITRE ATT&CK:
+//   - Tactics: Persistence (TA0003) / Initial Access (TA0001)
+//   - Techniques:
+//     - T1505.003: Server Software Component: Web Shell
+//     - T1190: Exploit Public-Facing Application
+// Severity: High (Web Shell) / Medium (Sondeo Web)
+// Data Source: W3CIISLog (Internet Information Services Web Server Logs)
+//              o AzureDiagnostics / AppServiceHTTPLogs
+//
+// Threshold:
+//   - Case A (Web Shell - T1505.003): Single occurrence (1 request) from an external IP
+//     containing execution parameters in URI stem or query: cmd=, exec=, .aspx?, or .php?
+//   - Case B (Sondeo Web - T1190): >= 10 requests within a 5-minute window from an
+//     external IP targeting sensitive endpoints: /admin, /login, or /api
+//
+// Python Equivalence:
+//   Mirrors `detections.py` constants:
+//     R13_WEBSHELL_URI_REGEX = r"cmd=|exec=|\.aspx\?|\.php\?"
+//     R13_PROBING_URI_REGEX = r"/admin|/login|/api"
+//     R13_PROBING_THRESHOLD = 10
+//     R13_TIME_WINDOW_MINUTES = 5
+//   Evaluates HTTP_ACCESS from external IPs. Flags individual web shell requests as
+//   Severity "Alto" (T1505.003). Groups probing requests by Source_IP in 5-minute
+//   windows and flags if count >= 10 as Severity "Medio" (T1190).
+//
+// Expected False Positives & Tuning Guidance:
+//   - Security teams performing scheduled Dynamic Application Security Testing (DAST)
+//     or authorized web vulnerability scans.
+//   - Single Page Applications (SPAs) generating bursts of REST API calls during user interaction.
+//   - Tuning: Whitelist authorized corporate penetration testing IP ranges and filter out
+//     legitimate internal API consumer IPs.
+// ==============================================================================
+
+let timeframe = 1h;
+let lookbackWindow = 5m;
+let WebShellRegex = @"(?i)(cmd=|exec=|\.aspx\?|\.php\?)";
+let ProbingRegex = @"(?i)(/admin|/login|/api)";
+let ProbingThreshold = 10;
+// 1. Caso A: Detección de comandos de Web Shell directos
+let WebShellDetections = W3CIISLog
+    | where TimeGenerated >= ago(timeframe)
+    | extend ClientIP = tostring(cIP)
+    | where isnotempty(ClientIP) and ClientIP !in ("-", "127.0.0.1", "::1", "0.0.0.0")
+    | where ipv4_is_private(ClientIP) == false
+    | extend FullURI = strcat(csUriStem, iff(isnotempty(csUriQuery), strcat("?", csUriQuery), ""))
+    | where FullURI matches regex WebShellRegex
+    | extend
+        RuleID = "R13",
+        RuleName = "Web Shell Execution Attempt",
+        TechniqueID = "T1505.003",
+        Tactic = "Persistence",
+        Severity = "High",
+        RequestCount = 1,
+        TargetEndpoints = pack_array(csUriStem)
+    | project
+        StartTime = TimeGenerated,
+        EndTime = TimeGenerated,
+        RuleID,
+        RuleName,
+        TechniqueID,
+        Tactic,
+        Severity,
+        ClientIP,
+        Computer,
+        TargetEndpoints,
+        RequestCount,
+        SampleFullURI = FullURI,
+        csMethod,
+        scStatus;
+// 2. Caso B: Detección de sondeo web masivo hacia endpoints sensibles
+let WebProbingDetections = W3CIISLog
+    | where TimeGenerated >= ago(timeframe)
+    | extend ClientIP = tostring(cIP)
+    | where isnotempty(ClientIP) and ClientIP !in ("-", "127.0.0.1", "::1", "0.0.0.0")
+    | where ipv4_is_private(ClientIP) == false
+    | extend FullURI = strcat(csUriStem, iff(isnotempty(csUriQuery), strcat("?", csUriQuery), ""))
+    // Filtrar rutas que coincidan con sondeo pero no web shell (para no duplicar)
+    | where FullURI matches regex ProbingRegex and not(FullURI matches regex WebShellRegex)
+    | summarize
+        StartTime = min(TimeGenerated),
+        EndTime = max(TimeGenerated),
+        RequestCount = count(),
+        TargetEndpoints = make_set(csUriStem, 20),
+        SampleFullURI = take_any(FullURI),
+        csMethod = take_any(csMethod),
+        scStatus = take_any(scStatus)
+        by ClientIP, Computer, bin(TimeGenerated, lookbackWindow)
+    | where RequestCount >= ProbingThreshold
+    | extend
+        RuleID = "R13",
+        RuleName = "Malicious Web Probing and Enumeration",
+        TechniqueID = "T1190",
+        Tactic = "Initial Access",
+        Severity = "Medium"
+    | project
+        StartTime,
+        EndTime,
+        RuleID,
+        RuleName,
+        TechniqueID,
+        Tactic,
+        Severity,
+        ClientIP,
+        Computer,
+        TargetEndpoints,
+        RequestCount,
+        SampleFullURI,
+        csMethod,
+        scStatus;
+// Consolidar ambas detecciones
+union WebShellDetections, WebProbingDetections
+| project
+    StartTime,
+    EndTime,
+    RuleID,
+    RuleName,
+    TechniqueID,
+    Tactic,
+    Severity,
+    ClientIP,
+    Computer,
+    RequestCount,
+    TargetEndpoints,
+    SampleFullURI,
+    csMethod,
+    scStatus

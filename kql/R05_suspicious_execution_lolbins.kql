@@ -1,0 +1,97 @@
+// ==============================================================================
+// Microsoft Sentinel Analytics Rule
+// Rule Name & ID: R05 - Suspicious Execution & LOLBins Abuse (Ejecución Sospechosa y LOLBins)
+// MITRE ATT&CK:
+//   - T1059.001: Execution - PowerShell
+//   - T1490: Impact - Inhibit System Recovery (vssadmin delete shadows)
+//   - T1135: Discovery - Network Share Discovery (net view, Get-SmbShare)
+//   - T1069.001: Discovery - Permission Groups Discovery (Get-LocalGroupMember)
+//   - T1033: Discovery - System Owner/User Discovery (whoami)
+//   - T1560.001: Collection - Archive via Utility (tar, 7z, rar, zip)
+//   - T1003: Credential Access - OS Credential Dumping (certutil urlcache, wmic, mimikatz)
+//   - T1505.003: Persistence - Web Shell Process Execution (IIS APPPOOL spawning shell)
+// Severity: High
+// Data Source: SecurityEvent (Windows Event IDs 4688, 4104) / DeviceProcessEvents
+//
+// Threshold:
+//   - Single occurrence (1 event) of process creation (4688) or PowerShell script
+//     block execution (4104) matching defined regex signatures or interactive shells
+//     spawned by IIS Application Pool accounts.
+//
+// Python Equivalence:
+//   Mirrors `R5_PATTERNS` in `detections.py`:
+//     "T1059.001": (r"-EncodedCommand|-enc", "Alto", "Execution")
+//     "T1490": (r"vssadmin.*delete.*shadows", "Alto", "Impact")
+//     "T1135": (r"net(\.exe)?\s+view|Get-SmbShare", "Alto", "Discovery")
+//     "T1069.001": (r"Get-LocalGroupMember", "Alto", "Discovery")
+//     "T1033": (r"\bwhoami\b", "Alto", "Discovery")
+//     "T1560.001": (r"(tar|7z|rar|zip).*(\s+-a|\s+a\s+|\s+-c)", "Alto", "Collection")
+//     "T1003": (r"certutil.*urlcache|wmic|mimikatz|sekurlsa", "Alto", "Credential Access")
+//     Web Shell: "IIS APPPOOL" in user and ("cmd.exe" or "powershell.exe" in command)
+//
+// Expected False Positives & Tuning Guidance:
+//   - IT automated management scripts (Microsoft Endpoint Manager, SCCM, Ansible) using encoded commands.
+//   - Routine backup jobs compressing directories with 7-Zip or tar.
+//   - Helpdesk staff running discovery commands (`whoami`, `net view`) during troubleshooting.
+//   - Tuning: Whitelist signed parent processes (e.g., CcmExec.exe) or approved service accounts
+//     via a Sentinel Watchlist (`_GetWatchlist('ApprovedAdminTools')`).
+// ==============================================================================
+
+let timeframe = 1h;
+SecurityEvent
+| where TimeGenerated >= ago(timeframe)
+| where EventID in (4688, 4104)
+| extend Command = tostring(coalesce(CommandLine, ScriptBlockText, ""))
+| extend UserAccount = tostring(coalesce(SubjectUserName, Account, ""))
+| where isnotempty(Command)
+// Coincidencias con los patrones exactos de R5 en detections.py
+| extend
+    MatchesEncodedPS = Command matches regex @"(?i)(-EncodedCommand|-enc)",
+    MatchesVssadmin = Command matches regex @"(?i)vssadmin.*delete.*shadows",
+    MatchesShareDisc = Command matches regex @"(?i)(net(\.exe)?\s+view|Get-SmbShare)",
+    MatchesGroupDisc = Command matches regex @"(?i)Get-LocalGroupMember",
+    MatchesWhoami = Command matches regex @"(?i)\bwhoami\b",
+    MatchesArchiving = Command matches regex @"(?i)(tar|7z|rar|zip).*(\s+-a|\s+a\s+|\s+-c)",
+    MatchesCredAccess = Command matches regex @"(?i)(certutil.*urlcache|wmic|mimikatz|sekurlsa)",
+    MatchesIISShell = (UserAccount matches regex @"(?i)IIS APPPOOL" and Command matches regex @"(?i)(cmd\.exe|powershell\.exe)")
+| where MatchesEncodedPS or MatchesVssadmin or MatchesShareDisc or MatchesGroupDisc
+     or MatchesWhoami or MatchesArchiving or MatchesCredAccess or MatchesIISShell
+| extend
+    RuleID = "R05",
+    RuleName = "Suspicious Execution and LOLBins Abuse",
+    Severity = "High",
+    TechniqueID = case(
+        MatchesEncodedPS, "T1059.001",
+        MatchesVssadmin, "T1490",
+        MatchesShareDisc, "T1135",
+        MatchesGroupDisc, "T1069.001",
+        MatchesWhoami, "T1033",
+        MatchesArchiving, "T1560.001",
+        MatchesCredAccess, "T1003",
+        MatchesIISShell, "T1505.003",
+        "T1059"
+    ),
+    Tactic = case(
+        MatchesEncodedPS, "Execution",
+        MatchesVssadmin, "Impact",
+        MatchesShareDisc, "Discovery",
+        MatchesGroupDisc, "Discovery",
+        MatchesWhoami, "Discovery",
+        MatchesArchiving, "Collection",
+        MatchesCredAccess, "Credential Access",
+        MatchesIISShell, "Persistence",
+        "Execution"
+    )
+| project
+    TimeGenerated,
+    RuleID,
+    RuleName,
+    TechniqueID,
+    Tactic,
+    Severity,
+    Computer,
+    UserAccount,
+    NewProcessName,
+    ParentProcessName,
+    Command,
+    EventID

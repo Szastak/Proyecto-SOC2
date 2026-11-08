@@ -1,0 +1,87 @@
+// ==============================================================================
+// Microsoft Sentinel Analytics Rule
+// Rule Name & ID: R11 - Persistence via Scheduled Tasks and Suspicious Services
+// MITRE ATT&CK:
+//   - Tactic: Persistence (TA0003) / Privilege Escalation (TA0004)
+//   - Techniques:
+//     - T1053.005: Scheduled Task/Job: Scheduled Task
+//     - T1543.003: Create or Modify System Process: Windows Service
+// Severity: High
+// Data Source: SecurityEvent (Event ID 4698) y Event / System (Event ID 7045)
+//
+// Threshold:
+//   - Single occurrence (1 event) of:
+//     * EventID 4698 (Scheduled Task Created) referencing: ProgramData, Temp, AppData, or powershell
+//     * EventID 7045 (New Service Installed) pointing to: ProgramData, Temp, AppData, or Users\Public
+//
+// Python Equivalence:
+//   Mirrors `detections.py` constants:
+//     R11_TASK_ACTION_REGEX = r"ProgramData|Temp|AppData|powershell"
+//     R11_SERVICE_PATH_REGEX = r"ProgramData|Temp|AppData|Users\\Public"
+//   Evaluates Event_ID == "4698" against R11_TASK_ACTION_REGEX (T1053.005),
+//   and Event_ID == "7045" against R11_SERVICE_PATH_REGEX (T1543.003).
+//   Enriched with Severity "Alto", Tactic "Persistence".
+//
+// Expected False Positives & Tuning Guidance:
+//   - User-space software updaters (Google Update, Edge Update, Zoom, Microsoft Teams)
+//     creating scheduled tasks in `AppData\Local` or `ProgramData`.
+//   - Legitimate software installers placing temporary services during update execution.
+//   - Tuning: Whitelist verified software vendors or signers via Sentinel Watchlist
+//     (`_GetWatchlist('ApprovedSoftwareVendors')`) and exclude default Microsoft updater paths.
+// ==============================================================================
+
+let timeframe = 1h;
+let TaskPathRegex = @"(?i)(ProgramData|Temp|AppData|powershell)";
+let ServicePathRegex = @"(?i)(ProgramData|Temp|AppData|Users\\Public)";
+// 1. Tareas programadas sospechosas (EventID 4698 en SecurityEvent)
+let SuspiciousTasks = SecurityEvent
+    | where TimeGenerated >= ago(timeframe)
+    | where EventID == 4698
+    | extend TaskContent = tostring(coalesce(TaskContent, Activity, CommandLine, EventData, ""))
+    | where TaskContent matches regex TaskPathRegex
+    | extend
+        RuleID = "R11",
+        RuleName = "Persistence via Scheduled Task",
+        TechniqueID = "T1053.005",
+        Tactic = "Persistence",
+        Severity = "High",
+        ArtifactType = "ScheduledTask",
+        ArtifactDetails = TaskContent,
+        UserAccount = tostring(coalesce(SubjectUserName, Account, ""));
+// 2. Servicios sospechosos instalados (EventID 7045 en System / Event / SecurityEvent)
+let SuspiciousServices = union isfuzzy=true
+    (
+        SecurityEvent
+        | where TimeGenerated >= ago(timeframe)
+        | where EventID == 7045
+    ),
+    (
+        Event
+        | where TimeGenerated >= ago(timeframe)
+        | where Source =~ "Service Control Manager" and EventID == 7045
+    )
+    | extend ServiceDetails = tostring(coalesce(RenderedDescription, EventData, ""))
+    | where ServiceDetails matches regex ServicePathRegex
+    | extend
+        RuleID = "R11",
+        RuleName = "Persistence via Suspicious Service Installation",
+        TechniqueID = "T1543.003",
+        Tactic = "Persistence",
+        Severity = "High",
+        ArtifactType = "WindowsService",
+        ArtifactDetails = ServiceDetails,
+        UserAccount = tostring(coalesce(UserName, "SYSTEM"));
+// Consolidar detecciones de persistencia
+union SuspiciousTasks, SuspiciousServices
+| project
+    TimeGenerated,
+    RuleID,
+    RuleName,
+    TechniqueID,
+    Tactic,
+    Severity,
+    ArtifactType,
+    Computer,
+    UserAccount,
+    EventID,
+    ArtifactDetails

@@ -1,0 +1,78 @@
+// ==============================================================================
+// Microsoft Sentinel Analytics Rule
+// Rule Name & ID: R08 - Mass File Access (Acceso Masivo a Archivos)
+// MITRE ATT&CK:
+//   - Tactic: Discovery (TA0007) / Collection (TA0009)
+//   - Techniques:
+//     - T1083: File and Directory Discovery
+//     - T1005: Data from Local System
+// Severity: Medium / High (si precede cifrado masivo)
+// Data Source: SecurityEvent (Windows Security Event Log - Event ID 4663)
+//
+// Threshold:
+//   - Time Window: 5 minutes (ventana temporal de 5 minutos)
+//   - Access Count: >= 10 file access attempts (EventID 4663)
+//   - Distinct Files: >= 10 distinct file paths/objects accessed by the same user
+//
+// Python Equivalence:
+//   Mirrors `detections.py` constants:
+//     R8_MASS_ACCESS_THRESHOLD = 10
+//     R8_TIME_WINDOW_MINUTES = 5
+//   Evaluates Event_ID == "4663" filtered by file access mask, grouped by User
+//   over a 5-minute sliding window checking for >= 10 total accesses and
+//   >= 10 distinct accessed file objects. Enriched with Severity "Medio",
+//   Technique "T1083", Tactic "Discovery".
+//
+// Expected False Positives & Tuning Guidance:
+//   - Windows Search Indexing service (SearchIndexer.exe) cataloging documents.
+//   - Antivirus / EDR software performing full system disk scans.
+//   - Developer IDEs or build systems (npm, git, Visual Studio) scanning project directories.
+//   - Tuning: Exclude system service accounts (`SYSTEM`, `LOCAL SERVICE`) and
+//     known security agents via process name filter (e.g., `MsMpEng.exe`).
+// ==============================================================================
+
+let timeframe = 1h;
+let lookbackWindow = 5m;
+let MassAccessThreshold = 10;
+SecurityEvent
+| where TimeGenerated >= ago(timeframe)
+| where EventID == 4663
+// Filtrar por objetos de tipo archivo o verificar nombre de objeto
+| where isnotempty(ObjectName)
+| where ObjectType =~ "File" or ObjectName matches regex @"(?i)\.[a-zA-Z0-9]{2,5}$"
+// Excluir cuentas de máquina y del sistema estándar
+| extend UserAccount = tostring(coalesce(SubjectUserName, Account, ""))
+| where isnotempty(UserAccount) and UserAccount !endswith "$" and UserAccount !in ("SYSTEM", "LOCAL SERVICE", "NETWORK SERVICE")
+// Agrupar por usuario, host y ventana temporal de 5 minutos
+| summarize
+    StartTime = min(TimeGenerated),
+    EndTime = max(TimeGenerated),
+    TotalAccessCount = count(),
+    DistinctFilesCount = dcount(ObjectName),
+    AccessedFileList = make_set(ObjectName, 50),
+    Processes = make_set(ProcessName, 10),
+    AccessMasks = make_set(AccessMask, 5)
+    by UserAccount, Computer, bin(TimeGenerated, lookbackWindow)
+// Umbral idéntico a detections.py (>= 10 accesos a >= 10 archivos distintos)
+| where TotalAccessCount >= MassAccessThreshold and DistinctFilesCount >= MassAccessThreshold
+| extend
+    RuleID = "R08",
+    RuleName = "Mass File Access",
+    TechniqueID = "T1083",
+    Tactic = "Discovery",
+    Severity = "Medium"
+| project
+    StartTime,
+    EndTime,
+    RuleID,
+    RuleName,
+    TechniqueID,
+    Tactic,
+    Severity,
+    UserAccount,
+    Computer,
+    TotalAccessCount,
+    DistinctFilesCount,
+    AccessedFileList,
+    Processes,
+    AccessMasks

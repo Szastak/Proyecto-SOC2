@@ -1,0 +1,76 @@
+// ==============================================================================
+// Microsoft Sentinel Analytics Rule
+// Rule Name & ID: R04 - Special Privileges Assigned to Compromised Account or Attack IP
+// MITRE ATT&CK:
+//   - Tactic: Privilege Escalation (TA0004) / Persistence (TA0003)
+//   - Technique: T1078.003 (Valid Accounts: Domain / Local Accounts)
+// Severity: High
+// Data Source: SecurityEvent (Windows Security Event Log)
+//
+// Threshold:
+//   - Trigger: Single occurrence (1 event) of EventID 4672 (Special privileges assigned
+//     to new logon) associated with a user or external IP previously involved in
+//     credential attack activity (R1/R2/R3).
+//
+// Python Equivalence:
+//   Mirrors `detections.py` R4 logic:
+//   Checks `Event_ID == "4672"` and triggers if `user in compromised_accounts`
+//   (after the compromise timestamp) or if `Source_IP in attack_ips` from prior R1/R2.
+//   Enriched with Severity = "Alto", Technique = "T1078.003", Tactic = "Privilege Escalation".
+//
+// Expected False Positives & Tuning Guidance:
+//   - Windows system services (`SYSTEM`, `LOCAL SERVICE`, `NETWORK SERVICE`) and machine accounts (`*$`)
+//     regularly receive special privileges during service startup.
+//   - Scheduled administrative tasks run by verified domain admins from internal workstations.
+//   - Tuning: Always exclude built-in system accounts (`SYSTEM`, `LOCAL SERVICE`, `NETWORK SERVICE`)
+//     and require correlation with an external IP address or an active compromised identity list.
+// ==============================================================================
+
+let timeframe = 2h;
+// 1. Identificar cuentas comprometidas o atacadas externamente en las últimas 2 horas
+let CompromisedIdentities = SecurityEvent
+    | where TimeGenerated >= ago(timeframe)
+    | where EventID in (4624, 4625)
+    | where isnotempty(IpAddress) and IpAddress !in ("-", "127.0.0.1", "::1", "0.0.0.0")
+    | where ipv4_is_private(IpAddress) == false
+    | where isnotempty(TargetUserName) and TargetUserName !endswith "$" and TargetUserName !in ("SYSTEM", "LOCAL SERVICE", "NETWORK SERVICE")
+    | summarize
+        FirstSeenAttack = min(TimeGenerated),
+        LastSeenAttack = max(TimeGenerated),
+        ExternalAttackIPs = make_set(IpAddress, 10),
+        FailedCount = countif(EventID == 4625),
+        SuccessCount = countif(EventID == 4624)
+        by TargetUserName
+    | where FailedCount >= 3 or SuccessCount >= 1;
+// 2. Detectar asignación de privilegios especiales (EventID 4672)
+let SpecialPrivilegeEvents = SecurityEvent
+    | where TimeGenerated >= ago(timeframe)
+    | where EventID == 4672
+    | where isnotempty(SubjectUserName) and SubjectUserName !endswith "$"
+    | where SubjectUserName !in ("SYSTEM", "LOCAL SERVICE", "NETWORK SERVICE", "ANONYMOUS LOGON");
+// 3. Correlacionar por usuario objetivo / sujeto
+SpecialPrivilegeEvents
+| join kind=inner (
+    CompromisedIdentities
+) on $left.SubjectUserName == $right.TargetUserName
+| where TimeGenerated >= FirstSeenAttack
+| extend
+    RuleID = "R04",
+    RuleName = "Special Privileges Assigned to Compromised Account",
+    TechniqueID = "T1078.003",
+    Tactic = "Privilege Escalation",
+    Severity = "High"
+| project
+    TimeGenerated,
+    RuleID,
+    RuleName,
+    TechniqueID,
+    Tactic,
+    Severity,
+    Account = SubjectUserName,
+    Computer,
+    PrivilegeList,
+    ExternalAttackIPs,
+    FirstSeenAttack,
+    PriorFailedCount = FailedCount,
+    PriorSuccessCount = SuccessCount
