@@ -1,4 +1,4 @@
-# Tema de la consola: Claro / Oscuro / Sistema (menu ⋮ -> Settings).
+# Tema de la consola: Claro / Oscuro / Sistema (menu ⋮ -> System / Light / Dark).
 # Con [theme.light] y [theme.dark] definidos, Streamlit ofrece los tres modos.
 [theme]
 font = "sans-serif"
