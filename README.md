@@ -18,7 +18,7 @@ Plataforma integral de análisis forense, ingeniería de detección y visualizac
 3. [Hallazgos Forenses e Incidentes Correlacionados](#-hallazgos-forenses-e-incidentes-correlacionados)
 4. [Metodología de Detección: Evidencia Antes que Intuición](#-metodología-de-detección-evidencia-antes-que-intuición)
    - [Falsedad de la Severidad Original del SIEM](#falsedad-de-la-severidad-original-del-siem)
-   - [Catálogo de Reglas Genéricas (R01 a R14)](#catálogo-de-reglas-genéricas-r01-a-r14)
+   - [Reglas de Detección (R01 a R14)](#reglas-de-detección-r01-a-r14)
    - [Anomalías de Calidad de Datos y Hallazgos Negativos](#anomalías-de-calidad-de-datos-y-hallazgos-negativos)
    - [Atribución de Amenazas (Metodología ACH)](#atribución-de-amenazas-metodología-ach)
 5. [Instalación y Puesta en Marcha (Ubuntu 24.04 LTS)](#-instalación-y-puesta-en-marcha-ubuntu-2404-lts)
@@ -88,21 +88,14 @@ El motor de correlación identificó un total de **6 incidentes de seguridad** d
 
 | Incidente | Título Operativo | Ventana Temporal | Hosts Afectados | Cuentas Involucradas | Eventos Maliciosos | Técnicas MITRE ATT&CK |
 | :---: | :--- | :---: | :--- | :--- | :---: | :--- |
-| **INC-01** | **Password Spraying y Compromiso de Cuenta Privilegiada** | 08:25:00 – 08:40:00 | `DC-01`, `WS-031` | `CORP\mgarcia`, `CORP\aperez`, `CORP\backupsvc`, `CORP\dtorres`, `CORP\helpdesk`, `CORP\jlopez`, `CORP\rrojas`, `CORP\slopez` | **35** | **T1110.003**, **T1110.001**, **T1078**, **T1078.003** |
+| **INC-01** | **Password Spraying y Compromiso de Cuenta Privilegiada** | 08:25:00 – 08:40:00 | `DC-01`, `WS-031` | `CORP\mgarcia` (comprometida) + 7 cuentas objetivo sin éxito | **35** | **T1110.003**, **T1110.001**, **T1078**, **T1078.003** |
 | **INC-02** | **Fuerza Bruta RDP, Intrusión y Movimiento Lateral con Exfiltración** | 09:02:00 – 09:21:00 | `APP-SRV01`, `FS-SRV01` | `CORP\admin` | **15** | **T1110.001**, **T1078**, **T1078.003**, **T1021.001**, **T1021.002**, **T1059.001**, **T1069.001**, **T1135**, **T1039**, **T1560.001**, **T1041** |
 | **INC-03** | **Actividad Previa a Ransomware y Borrado de Copias Shadow** | 09:36:00 – 09:42:00 | `FS-SRV01`, `WS-023` | `CORP\backupsvc` | **18** | **T1059.001**, **T1083**, **T1490** |
 | **INC-04** | **Exfiltración Masiva de Documentos Confidenciales vía Proxy** | 10:40:00 – 10:49:18 | `FS-SRV01`, `WS-018` | `CORP\rrojas` | **24** | **T1039**, **T1560.001**, **T1048.002** |
 | **INC-05** | **Persistencia mediante Tarea Programada y Servicio con Balizamiento C2** | 11:37:00 – 12:04:00 | `APP-SRV01` | `CORP\helpdesk` | **7** | **T1053.005**, **T1543.003**, **T1071.001** |
 | **INC-06** | **Compromiso de Servidor Web por Web Shell y Ejecución Remota** | 12:10:00 – 12:15:00 | `WEB-01` | `IIS APPPOOL\DefaultAppPool` | **22** | **T1190**, **T1505.003**, **T1033** |
 
-### Resumen Técnico de Cada Cadena de Intrusión
-
-- **INC-01**: La IP pública `203.0.113.74` ejecutó un ataque distribuido de pulverización de contraseñas contra el controlador de dominio `DC-01`, rotando 8 identidades corporativas cada ~19 segundos (33 eventos fallidos `4625`). A las 08:39 se produjo el inicio de sesión exitoso (`4624`) de la cuenta `CORP\mgarcia`, seguido a las 08:40 por la asignación de privilegios administrativos especiales (`4672`) en la estación `WS-031`.
-- **INC-02**: Desde la IP `198.51.100.77` se perpetró un ataque de fuerza bruta RDP (`LogonType=10`) sobre el servidor de aplicaciones `APP-SRV01` contra la cuenta `CORP\admin`. Tras 4 fallos, se logró acceso exitoso a las 09:06, procediendo a ejecutar comandos codificados de PowerShell (`-EncodedCommand`), reconocimiento local (`Get-LocalGroupMember`, `Get-SmbShare`, `net view`), movimiento lateral SMB (`LogonType=3`) hacia el servidor de archivos `FS-SRV01`, empaquetado de presupuestos financieros (`tar finance.zip`) y exfiltración C2 vía socket TCP a `203.0.113.88:443`.
-- **INC-03**: La cuenta de servicio `CORP\backupsvc` fue activada anómalamente en `WS-023` (10.10.1.44), ejecutando PowerShell codificado y accediendo masivamente a 16 hojas de cálculo en red (`Finance\FY2026\document_000..015.xlsx`) en 4 minutos. A las 09:42 ejecutó `vssadmin delete shadows /all /quiet`, inhabilitando las copias de seguridad de volumen local en un patrón típico de preparativo de ransomware.
-- **INC-04**: El usuario `CORP\rrojas` accedió al recurso compartido confidencial `\\FS-SRV01\Legal`, comprimió expedientes legales con `7z.exe a archive.7z C:\Legal\*.docx` y los exfiltró hacia la IP externa `198.51.100.88:443` a través de 22 peticiones HTTP POST consecutivas espaciadas exactamente 18 segundos, transfiriendo un total de **253.305.558 bytes (~253 MB)**.
-- **INC-05**: Utilizando la identidad `CORP\helpdesk` en `APP-SRV01`, los atacantes anclaron mecanismos de persistencia creando la tarea programada `\Microsoft\Windows\UpdateCheck` (invocando `updatecheck.ps1`) e instalando el servicio de sistema `WinUpdateHelper` (`C:\ProgramData\wuhelper.exe`). Dicho binario estableció balizamiento C2 periódico cada 6 minutos exactos con dispersión temporal nula (jitter < 10%).
-- **INC-06**: La IP externa `192.0.2.91` lanzó un sondeo masivo (21 peticiones HTTP) contra `WEB-01` apuntando a endpoints sensibles (`/admin/`, `/login`, `/api/v1/export`), logrando cargar e interactuar con la web shell `/uploads/test.aspx?cmd=whoami`. A las 12:15, el proceso `w3wp.exe` bajo la cuenta `IIS APPPOOL\DefaultAppPool` ejecutó `cmd.exe /c whoami`.
+> La cronología completa de cada incidente (eventos con `Log_ID`, IoCs, matriz MITRE ATT&CK y playbook de contención) está en el informe [`sample_report.pdf`](sample_report.pdf).
 
 ---
 
@@ -115,50 +108,28 @@ Uno de los aportes metodológicos centrales de esta investigación es la aplicac
 En entornos operacionales reales, los registros SIEM etiquetan los eventos de acuerdo con plantillas estáticas de severidad que no contemplan el contexto del adversario. En este dataset, eventos de altísima criticidad e impacto destructivo llegaron catalogados como **"Informational"** o **"Warning"**:
 1. **EVT-00123**: Autenticación exitosa (`Event_ID 4624`) de la cuenta `CORP\mgarcia` desde la IP externa `203.0.113.74` inmediatamente después de un ataque masivo de password spraying -> Clasificado originalmente como *Informational*.
 2. **EVT-00428**: Ejecución de la herramienta `7z.exe` para compactar contratos clasificados (`C:\Legal\*.docx`) previa a la fuga masiva -> Clasificado originalmente como *Informational*.
-3. **EVT-00528, 542, 548, 559, 564**: Balizamiento periódico regular y automatizado del binario `wuhelper.exe` hacia infraestructura C2 -> Clasificado originalmente como *Informational*.
-4. **EVT-00314**: Invocación de `vssadmin delete shadows /all /quiet` para eliminar instantáneas de volumen -> Clasificado originalmente como *Medium*.
+3. **EVT-00528, 542, 548, 559, 564**: Ejecución periódica del binario `wuhelper.exe` cada 6 minutos exactos (patrón de beacon; el destino de red no figura en la telemetría) -> Clasificado originalmente como *Informational*.
+4. **EVT-00314**: Invocación de `vssadmin delete shadows /all /quiet` para eliminar instantáneas de volumen -> Clasificado originalmente como *Warning*.
 
 **Decisión Analítica:** El motor `detections.py` **ignora la severidad provista por la fuente** y recalcula de forma determinista la severidad analítica (`Severidad_SOC`: **Alto**, **Medio** o **Bajo**) correlacionando ventanas de tiempo, frecuencias, anomalías estadísticas y abuso de utilidades LOLBins.
 
-### Catálogo de Reglas Genéricas (R01 a R14)
+### Reglas de Detección (R01 a R14)
 
-El motor implementa 14 reglas genéricas configuradas con umbrales objetivos, **sin filtros hardcodeados por entidad** (IPs, usuarios o hostnames fijos prohibidos en la lógica):
+El motor implementa **14 reglas genéricas** basadas en umbrales, ventanas temporales y patrones de comportamiento, **sin entidades hardcodeadas** (IPs, usuarios u hostnames fijos). Un test automatizado lo verifica, y las reglas detectan los mismos 6 incidentes aunque se renombren las entidades del dataset.
 
-| Regla | Nombre de la Regla | Técnica MITRE | Umbral Analítico Objetivo | Justificación y Ventana Temporal |
-| :---: | :--- | :---: | :--- | :--- |
-| **R01** | Password Spraying | **T1110.003** | `>= 10` fallos contra `>= 5` usuarios distintos en `<= 15 min` | Detección de ataques horizontales distribuidos desde IP pública para eludir bloqueos. |
-| **R02** | Fuerza Bruta Vertical | **T1110.001** | `>= 3` fallos sobre la misma cuenta en `<= 10 min` | Adivinación concentrada de credenciales contra una cuenta objetivo individual. |
-| **R03** | Cuenta Comprometida tras Ataque | **T1078** | Éxito (`4624`) en `<= 30 min` tras ataque R01/R02 | Confirmación de intrusión exitosa correlacionada con la misma IP externa hostil. |
-| **R04** | Privilegios Especiales Anómalos | **T1078.003** | Evento `4672` en cuenta o IP bajo ataque previo | Detección de sesiones administrativas asignadas a identidades recién vulneradas. |
-| **R05** | Ejecución Sospechosa y LOLBins | **T1059.001**, **T1490**, etc. | Match de regex (`-enc`, `vssadmin`, `whoami`, `tar`, `7z`) | Uso malicioso de herramientas nativas del sistema operativo para evasión y recolección. |
-| **R06** | Movimiento Lateral (RDP / SMB) | **T1021.001**, **T1021.002** | RDP externo (`LogonType=10`) o red SMB (`LogonType=3`) | Propagación interna entre servidores o accesos de escritorio remoto no autorizados. |
-| **R07** | Acceso a Recursos Sensibles | **T1039** | Acceso a shares matching `Finance\|Legal\|HR\|Confidential` | Monitoreo estricto de repositorios de red que almacenan datos de alto valor. |
-| **R08** | Acceso Masivo a Archivos Locales | **T1083** | `>= 10` accesos a `>= 10` archivos en `<= 5 min` (`4663`) | Patrón característico de cifrado por ransomware o cosecha acelerada de información. |
-| **R09** | Exfiltración Masiva por Proxy | **T1048.002** | Suma de `bytes_out >= 100 MB` en `<= 15 min` vía POST | Transferencia no autorizada de grandes volúmenes de datos hacia el exterior. |
-| **R10** | Conexión C2 Saliente por CLI | **T1041** | Conexión saliente (`5156`) iniciada por `powershell` o `cmd` | Sockets de red interactivos creados directamente por consolas hacia IPs públicas. |
-| **R11** | Persistencia (Tareas / Servicios) | **T1053.005**, **T1543.003** | Tareas en `ProgramData/Temp` o servicios en rutas de usuario | Creación de artefactos para garantizar acceso persistente tras reinicios. |
-| **R12** | Balizamiento C2 Periódico | **T1071.001** | `>= 4` ejecuciones con ratio de jitter (`stdev / avg`) `< 0.10` | Identificación de regularidad matemática en llamadas automatizadas a infraestructura C2. |
-| **R13** | Web Shell y Sondeo Web | **T1505.003**, **T1190** | Parámetros `cmd=\|exec=` o `>= 10` hits en 5 min | Inyección de comandos en aplicaciones web o escaneo sistemático de endpoints. |
-| **R14** | Anomalía de Calidad de Datos | N/A | Detección de drift en nombres o identidades duplicadas | Aislamiento de inconsistencias en telemetría sin clasificarlas como incidentes. |
+- Umbrales y lógica: constantes documentadas al inicio de [`detections.py`](detections.py) y Anexo A de [`sample_report.pdf`](sample_report.pdf).
+- Equivalentes para Microsoft Sentinel: [`kql/README.md`](kql/README.md).
 
 ### Anomalías de Calidad de Datos y Hallazgos Negativos
 
 El motor aísla de forma explícita las inconsistencias de telemetría asignándoles severidad **Bajo** y marcando la columna `Anomalia_Dato`, evitando falsos positivos en las métricas de intrusión:
 - **Hostname `DC01` vs `DC-01`**: 30 eventos registran el hostname sin guion (`DC01`) y carecen de campo `Destination`. Esto responde a telemetría proveniente de un sensor no normalizado o un equipo duplicado.
 - **Identidad `CORP\svc_backup` vs `CORP\backupsvc`**: Coexisten dos cuentas de servicio con grafía semejante. Los 24 eventos de `CORP\svc_backup` resultaron completamente benignos, tratándose de una posible cuenta look-alike o duplicidad administrativa.
-- **Hallazgo Negativo Crítico (Eventos 4720 y 4732)**: Se auditó la ausencia total (**0 eventos**) de creación de usuarios (`4720`) o agregado a grupos privilegiados (`4732`). Esto demuestra que los adversarios operaron con disciplina de sigilo, utilizando credenciales legítimas preexistentes y web shells en lugar de crear cuentas ruidosas en Active Directory.
+- **Hallazgo Negativo Crítico (Eventos 4720 y 4732)**: Se auditó la ausencia total (**0 eventos**) de creación de usuarios (`4720`) o agregado a grupos privilegiados (`4732`). Con la telemetría provista, la actividad maliciosa se explica por el uso de credenciales existentes, persistencia por tarea/servicio y una web shell; la creación de cuentas fuera de la ventana de logs no puede descartarse (verificar `whenCreated` en AD).
 
 ### Atribución de Amenazas (Metodología ACH)
 
-Siguiendo la metodología de **Análisis de Hipótesis Competitivas (ACH)** desarrollada por Richards J. Heuer Jr., se contrastaron tres hipótesis de atribución:
-- **H1**: Un único actor avanzado coordinado (Campaña lineal).
-- **H2**: Múltiples actores de amenazas oportunistas e independientes actuando concurrentemente.
-- **H3**: Un Initial Access Broker (IAB) que comercializó accesos independientes a diversos operadores.
-
-**Conclusión ACH:** La evidencia técnica refuta H1 y concluye que **H2 (Múltiples actores oportunistas)** es la hipótesis más consistente, fundamentada en:
-1. **Infraestructura Disjunta**: 5 direcciones IP externas completamente independientes sin solapamiento de rangos ni sistemas autónomos.
-2. **Redundancia Táctica Ilógica**: El ataque por fuerza bruta RDP contra `CORP\admin` en `APP-SRV01` (09:02) resulta operativo y técnicamente innecesario si un único actor ya poseía acceso con privilegios administrativos en `WS-031` (08:40).
-3. **Cese Estanco de Credenciales**: La cuenta `mgarcia` queda inactiva a las 08:40 y jamás vuelve a ser utilizada por los vectores subsiguientes.
+Se contrastaron tres hipótesis mediante Análisis de Hipótesis Competitivas: **H1** un único actor, **H2** múltiples actores independientes y **H3** un Initial Access Broker. La evidencia disponible (IPs y TTPs distintas por incidente, inactividad de `mgarcia` tras 08:40 y fuerza bruta externa innecesaria si existiera acceso interno previo) hace de **H2 la hipótesis más consistente**, sin descartar H3. **Confianza: baja-media**, por la falta de telemetría de VPN, EDR y threat intel. El análisis completo está en la sección 2.6 de [`sample_report.pdf`](sample_report.pdf).
 
 ---
 
