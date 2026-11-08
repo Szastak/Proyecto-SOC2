@@ -147,8 +147,8 @@ El sistema ha sido desarrollado y optimizado para ejecutarse en **Ubuntu 24.04 L
 
 1. **Clonar el repositorio:**
    ```bash
-   git clone https://github.com/szastak/nordic-shadow-hunter.git
-   cd nordic-shadow-hunter
+   git clone https://github.com/Szastak/Proyecto-SOC2.git
+   cd Proyecto-SOC2
    ```
 
 2. **Copiar el archivo de telemetría oficial al directorio `data/`:**
@@ -310,7 +310,7 @@ nordic-shadow-hunter/
 
 - **Informe Forense de Muestra (PDF)**: [sample_report.pdf](sample_report.pdf)
 - **Demostración en Video**: `[PENDIENTE — Enlace de YouTube no listado]`
-- **Repositorio del Proyecto**: `https://github.com/szastak/nordic-shadow-hunter`
+- **Repositorio del Proyecto**: `https://github.com/Szastak/Proyecto-SOC2`
 
 ---
 
