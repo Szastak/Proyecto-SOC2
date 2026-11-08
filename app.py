@@ -213,13 +213,13 @@ def build_pdf_cached(file_bytes: bytes, file_sha: str, analyst: str) -> bytes:
 
 def generate_gemini_summary(kpis: Dict[str, Any], incidents: List[Dict[str, Any]],
                             api_key: str) -> str:
-    """Resumen opcional con Gemini (solo si existe GEMINI_API_KEY)."""
+    """Resumen con Gemini sobre hallazgos verificados (la clave va en header, no en la URL)."""
     try:
         import requests
 
         model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
         url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
-               f"{model}:generateContent?key={api_key}")
+               f"{model}:generateContent")
         prompt = (
             "Eres analista SOC L2. Redacta un resumen ejecutivo de 3 parrafos, sin "
             "inventar datos, basado solo en esto:\n"
@@ -229,9 +229,16 @@ def generate_gemini_summary(kpis: Dict[str, Any], incidents: List[Dict[str, Any]
             f"- Hosts afectados: {kpis['hosts']}\n"
             f"- IPs externas: {kpis['ips']}\n"
             f"- Volumen saliente en incidentes: ~{kpis['mb_out']:.0f} MB\n"
-            "Incidentes: " + "; ".join(f"{i['id']}: {i['titulo']}" for i in incidents)
+            "Incidentes (datos verificados por el motor de reglas):\n" + "\n".join(
+                f"- {i['id']}: {i['titulo']} | hosts: {', '.join(i['hosts'])} | "
+                f"técnicas: {', '.join(i.get('tecnicas', [])[:8])} | "
+                f"ventana: {i['inicio']:%H:%M}-{i['fin']:%H:%M}"
+                for i in incidents)
+            + "\nResponde en español, en prosa para la dirección (sin jerga), y no agregues "
+              "IPs, nombres ni cifras que no estén en estos datos."
         )
-        resp = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]},
+        resp = requests.post(url, headers={"x-goog-api-key": api_key},
+                             json={"contents": [{"parts": [{"text": prompt}]}]},
                              timeout=15)
         if resp.status_code == 200:
             return resp.json()["candidates"][0]["content"]["parts"][0]["text"]
@@ -300,8 +307,31 @@ def render_kpis(k: Dict[str, Any]):
         f"{k['bytes_out']:,} bytes_out registrados en proxy HTTP POST (posible exfiltración no confirmada).")
 
 
+def render_ai_panel(k, incidents, env_key):
+    """Panel de IA siempre visible: explica hallazgos ya verificados (no detecta)."""
+    with st.expander("🤖 Resumen ejecutivo asistido por IA (Gemini)", expanded=False):
+        st.caption("Las reglas detectan; la IA solo redacta sobre los hallazgos ya verificados. "
+                   "Se envían cifras, títulos, hosts y técnicas MITRE de los incidentes, "
+                   "nunca los logs crudos.")
+        key = env_key
+        if not key:
+            st.info("Para activarla, definí la variable `GEMINI_API_KEY` antes de iniciar la app "
+                    "o pegá una clave de Google AI Studio (gratuita) aquí abajo. "
+                    "La clave se usa solo en esta sesión y no se guarda.")
+            key = st.text_input("Clave de API de Gemini", type="password",
+                                key="gemini_session_key") or None
+        if st.button("Generar resumen con IA", disabled=not key):
+            with st.spinner("Consultando Gemini..."):
+                st.session_state["ai_summary"] = generate_gemini_summary(k, incidents, key)
+        if st.session_state.get("ai_summary"):
+            st.markdown(st.session_state["ai_summary"])
+            st.caption(f"Modelo: `{os.getenv('GEMINI_MODEL', 'gemini-2.5-flash')}` · "
+                       "Verificá las cifras contra los indicadores de arriba antes de usar este texto.")
+
+
 def render_resumen(df, incidents, k, gemini_key):
     render_kpis(k)
+    render_ai_panel(k, incidents, gemini_key)
     mal = df[df["Severidad_SOC"].isin(["Alto", "Medio"])].copy()
 
     # Grafico temporal: picos de actividad maliciosa
@@ -370,10 +400,6 @@ def render_resumen(df, incidents, k, gemini_key):
                                     "Regla", "Tecnica_MITRE"]],
                              width="stretch", hide_index=True)
 
-    if gemini_key:
-        with st.expander("🤖 Resumen asistido por IA (opcional, Gemini)"):
-            if st.button("Generar resumen"):
-                st.markdown(generate_gemini_summary(k, incidents, gemini_key))
 
 
 def render_incidentes(df, incidents, iocs):

@@ -254,7 +254,6 @@ Proyecto-SOC2/
 ├── detections.py               # Motor de correlación SIEM, reglas R01-R14, clustering e IoCs
 ├── docs/
 │   ├── Informe_Proyecto_Final.pdf  # Informe de síntesis del proyecto final (2 páginas)
-│   ├── guion_video.md              # Guion estructurado para la demostración en video (≤ 5 min)
 │   └── screenshots/            # Directorio para capturas de pantalla de la interfaz
 │       ├── .gitkeep
 │       ├── 01_kpis.png         # Captura: Panel de KPIs y filtros globales
@@ -312,7 +311,7 @@ Proyecto-SOC2/
 
 - **Informe de Síntesis del Proyecto Final (PDF, 2 páginas)**: [docs/Informe_Proyecto_Final.pdf](docs/Informe_Proyecto_Final.pdf)
 - **Informe Forense de Muestra (PDF, 21 páginas)**: [sample_report.pdf](sample_report.pdf)
-- **Demostración en Video**: `[PENDIENTE]`
+- **Demostración en Video**: [youtu.be/X1NJu_VQ_mg](https://youtu.be/X1NJu_VQ_mg)
 - **Repositorio del Proyecto**: `https://github.com/Szastak/Proyecto-SOC2`
 
 ---
