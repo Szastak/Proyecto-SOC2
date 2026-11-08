@@ -245,6 +245,39 @@ def generate_gemini_summary(kpis: Dict[str, Any], incidents: List[Dict[str, Any]
 # ==============================================================================
 
 
+def style_time_axis(fig, height: int):
+    """Eje temporal navegable desde PC: barra de desplazamiento + botones de escala."""
+    fig.update_xaxes(
+        rangeslider=dict(visible=True, thickness=0.09),
+        rangeselector=dict(
+            buttons=[
+                dict(count=15, label="15 min", step="minute", stepmode="backward"),
+                dict(count=30, label="30 min", step="minute", stepmode="backward"),
+                dict(count=1, label="1 h", step="hour", stepmode="backward"),
+                dict(label="Todo", step="all"),
+            ],
+            x=0, y=1.12, xanchor="left", yanchor="bottom",
+            bgcolor="rgba(59,130,246,0.10)", activecolor="rgba(59,130,246,0.40)",
+            bordercolor="rgba(59,130,246,0.55)", borderwidth=1,
+            font=dict(color="#3B82F6"),
+        ),
+        title_text="",
+    )
+    fig.update_layout(
+        height=height,
+        margin=dict(l=0, r=0, t=70, b=0),
+        legend=dict(orientation="h", x=0.27, y=1.12, xanchor="left", yanchor="bottom",
+                    title_text=""),
+        dragmode="pan",
+    )
+    return fig
+
+
+# Barra de herramientas del grafico: sin logo y con zoom por rueda del mouse.
+PLOTLY_CONFIG = {"displaylogo": False, "scrollZoom": True,
+                 "modeBarButtonsToRemove": ["lasso2d", "select2d"]}
+
+
 def kpi(col, key: str, label: str, value: str, help_text: str):
     """Tarjeta KPI nativa con borde de color (se adapta al tema)."""
     with col.container(border=True, key=key):
@@ -282,9 +315,11 @@ def render_resumen(df, incidents, k, gemini_key):
             fig = px.bar(serie, x="Timestamp", y="Eventos", color="Severidad_SOC",
                          color_discrete_map=SEVERITY_COLORS,
                          category_orders={"Severidad_SOC": SEVERITY_ORDER})
-            fig.update_layout(height=280, margin=dict(l=0, r=0, t=10, b=0),
-                              legend_title_text="", xaxis_title="", bargap=0.1)
-            st.plotly_chart(fig, width="stretch", theme="streamlit")
+            fig.update_layout(bargap=0.1)
+            style_time_axis(fig, 380)
+            st.plotly_chart(fig, width="stretch", theme="streamlit", config=PLOTLY_CONFIG)
+            st.caption("Arrastrá la barra inferior o usá los botones para recorrer la escala "
+                       "de tiempo; doble clic sobre el gráfico vuelve a la vista completa.")
 
     left, right = st.columns(2)
     with left, st.container(border=True):
@@ -300,7 +335,7 @@ def render_resumen(df, incidents, k, gemini_key):
                                       "Incidente": [i["id"] for i in incidents]})
         fig.update_layout(height=320, margin=dict(l=0, r=0, t=10, b=0),
                           legend_title_text="", yaxis_title="")
-        st.plotly_chart(fig, width="stretch", theme="streamlit")
+        st.plotly_chart(fig, width="stretch", theme="streamlit", config=PLOTLY_CONFIG)
 
     with right, st.container(border=True):
         st.markdown("**Tácticas MITRE ATT&CK observadas**")
@@ -315,7 +350,7 @@ def render_resumen(df, incidents, k, gemini_key):
         fig = px.bar(df_t, x="Eventos", y="Táctica", orientation="h")
         fig.update_traces(marker_color="#3B82F6")
         fig.update_layout(height=320, margin=dict(l=0, r=0, t=10, b=0), yaxis_title="")
-        st.plotly_chart(fig, width="stretch", theme="streamlit")
+        st.plotly_chart(fig, width="stretch", theme="streamlit", config=PLOTLY_CONFIG)
 
     with st.container(border=True):
         st.markdown("**Severidad de la fuente vs severidad SOC recalculada**")
@@ -354,9 +389,11 @@ def render_incidentes(df, incidents, iocs):
                                      "Process_CommandLine"],
                          category_orders={"Incidente": [i["id"] for i in incidents]})
         fig.update_traces(marker=dict(size=9))
-        fig.update_layout(height=300, margin=dict(l=0, r=0, t=10, b=0),
-                          legend_title_text="", xaxis_title="", yaxis_title="")
-        st.plotly_chart(fig, width="stretch", theme="streamlit")
+        fig.update_layout(yaxis_title="")
+        style_time_axis(fig, 420)
+        st.plotly_chart(fig, width="stretch", theme="streamlit", config=PLOTLY_CONFIG)
+        st.caption("Arrastrá la barra inferior o usá los botones para recorrer la escala "
+                   "de tiempo; doble clic sobre el gráfico vuelve a la vista completa.")
 
     for inc in incidents:
         sev_icon = "🔴" if inc.get("severidad") == "Alto" else "🟠"
