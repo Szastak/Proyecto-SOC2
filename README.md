@@ -204,7 +204,7 @@ Pestañas **"🔍 Explorador de Datos"** y **"🎯 Indicadores de Compromiso (Io
 ![Explorador de IoCs y Filtros](docs/screenshots/04_filtros.png)
 
 ### 5. Emisión de Informe Forense PDF
-Sección inferior **"📑 Generación de Informe Forense PDF"**: botón de compilación directa conectado a `report.build_pdf(...)`. Genera un documento PDF formal de nivel auditoría (más de 8 páginas de extensión), estructurado en Resumen Ejecutivo (impacto NIS2/RGPD) y Resumen Técnico (matriz MITRE, cronología, IoCs, atribución ACH y playbooks de contención).
+Módulo **"📄 Informe PDF"**: compilación directa conectada a `report.build_pdf(...)` (ejemplificado en [`sample_report.pdf`](sample_report.pdf), de **21 páginas**). Genera un documento PDF formal de nivel auditoría estructurado en **Parte 1 — Resumen Ejecutivo** (impacto en el negocio, cumplimiento RGPD Art. 33 y Directiva NIS2, prioridades P1–P5 y matriz de riesgo) y **Parte 2 — Resumen Técnico** (matriz MITRE ATT&CK, cronología por `Log_ID`, IoCs, atribución ACH, brechas de visibilidad, playbooks de contención y Anexos A–B).
 
 *(Captura de referencia: `docs/screenshots/05_pdf.png`)*  
 ![Módulo de Generación PDF](docs/screenshots/05_pdf.png)
@@ -253,6 +253,8 @@ Proyecto-SOC2/
 │   └── SOC_L2_Logs_Ampliados_Multiples_Incidentes.xlsx  # Dataset oficial de telemetría (local)
 ├── detections.py               # Motor de correlación SIEM, reglas R01-R14, clustering e IoCs
 ├── docs/
+│   ├── Informe_Proyecto_Final.pdf  # Informe de síntesis del proyecto final (2 páginas)
+│   ├── guion_video.md              # Guion estructurado para la demostración en video (≤ 5 min)
 │   └── screenshots/            # Directorio para capturas de pantalla de la interfaz
 │       ├── .gitkeep
 │       ├── 01_kpis.png         # Captura: Panel de KPIs y filtros globales
@@ -308,8 +310,9 @@ Proyecto-SOC2/
 
 ## 🔗 Enlaces de Entrega
 
-- **Informe Forense de Muestra (PDF)**: [sample_report.pdf](sample_report.pdf)
-- **Demostración en Video**: `[PENDIENTE — Enlace de YouTube no listado]`
+- **Informe de Síntesis del Proyecto Final (PDF, 2 páginas)**: [docs/Informe_Proyecto_Final.pdf](docs/Informe_Proyecto_Final.pdf)
+- **Informe Forense de Muestra (PDF, 21 páginas)**: [sample_report.pdf](sample_report.pdf)
+- **Demostración en Video**: `[PENDIENTE]`
 - **Repositorio del Proyecto**: `https://github.com/Szastak/Proyecto-SOC2`
 
 ---
