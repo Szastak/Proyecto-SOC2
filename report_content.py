@@ -373,11 +373,13 @@ TECHNICAL_SUMMARY = {
             (
                 "1. Bloquear IP de origen RDP:\n"
                 "   New-NetFirewallRule -DisplayName 'Block-Attacker-198.51.100.77' -Direction Inbound -Action Block -RemoteAddress 198.51.100.77\n"
-                "2. Deshabilitar y resetear contraseña de cuenta admin:\n"
+                "2. Bloquear conexión saliente de exfiltración:\n"
+                "   New-NetFirewallRule -DisplayName 'Block-Outbound-203.0.113.88' -Direction Outbound -Action Block -RemoteAddress 203.0.113.88\n"
+                "3. Deshabilitar y resetear contraseña de cuenta admin:\n"
                 "   Disable-ADAccount -Identity 'admin'; Set-ADAccountPassword -Identity 'admin' -Reset\n"
-                "3. Forzar Network Level Authentication (NLA) obligatorio en RDP:\n"
+                "4. Forzar Network Level Authentication (NLA) obligatorio en RDP:\n"
                 "   Set-ItemProperty -Path 'HKLM:\\System\\CurrentControlSet\\Control\\Terminal Server\\WinStations\\RDP-Tcp' -Name 'UserAuthentication' -Value 1\n"
-                "4. Aislar temporalmente APP-SRV01 para inspección forense de memoria."
+                "5. Aislar temporalmente APP-SRV01 para inspección forense de memoria."
             ),
         ],
         [
@@ -397,7 +399,7 @@ TECHNICAL_SUMMARY = {
             "Interrupción de Canal de Fuga y Saneamiento de Cuentas",
             (
                 "1. Bloquear destino proxy en pasarela perimetral:\n"
-                "   Set-ProxyBlockRule -Destination '203.0.113.88' -Action Deny\n"
+                "   Set-ProxyBlockRule -Destination '198.51.100.88' -Action Deny\n"
                 "2. Deshabilitar cuenta rrojas y cerrar sesiones activas:\n"
                 "   Disable-ADAccount -Identity 'rrojas'; Revoke-MgUserSignInSession -UserId 'rrojas@nordicenergy.se'\n"
                 "3. Auditoría forense de archivos accedidos en recursos compartidos Finance y Legal."
@@ -412,8 +414,8 @@ TECHNICAL_SUMMARY = {
                 "   sc.exe delete WinUpdateHelper\n"
                 "2. Eliminar tarea programada maliciosa:\n"
                 "   schtasks /delete /tn '\\Microsoft\\Windows\\UpdateCheck' /f\n"
-                "3. Bloquear IP de balizamiento C2:\n"
-                "   New-NetFirewallRule -DisplayName 'Block-C2-198.51.100.88' -Direction Outbound -Action Block -RemoteAddress 198.51.100.88"
+                "3. Contención de red y detección de destino C2:\n"
+                "   Identificar el destino C2 con EDR/firewall (no observado en la telemetría) y bloquearlo una vez confirmado; aislar APP-SRV01."
             ),
         ],
         [
@@ -441,20 +443,20 @@ ANNEX_A = {
     "TITLE": "Anexo A: Reglas de Detección y Umbrales Operativos (R1 a R14)",
     "HEADERS": ["Regla", "Nombre Operativo", "Umbral / Criterio Técnico", "Severidad", "Táctica MITRE"],
     "RULES": [
-        ["R1", "Password Spraying", ">= 10 fallos (EID 4625), >= 5 usuarios distintos en ventana de 15 min", "Medio", "Credential Access"],
-        ["R2", "Fuerza Bruta RDP / Logon", ">= 3 fallos (EID 4625) en ventana de 10 min sobre el mismo usuario/host", "Medio", "Credential Access"],
-        ["R3", "Éxito Tras Ataque", "Logon exitoso (EID 4624) dentro de 30 min tras evento R1 o R2", "Alto", "Initial Access"],
-        ["R4", "Logon Anómalo / Administrador", "Logon con cuenta de servicio o privilegiada fuera de horario / interactivo", "Medio", "Initial Access"],
-        ["R5", "LOLBins y Comandos Sospechosos", "Invocación de vssadmin delete, tar/zip, whoami, certutil, mimikatz", "Alto", "Execution / Impact"],
-        ["R6", "Movimiento Lateral (RDP/SMB)", "Logon Tipo 10 (RDP) o Tipo 3 (SMB) entre estaciones y servidores", "Medio", "Lateral Movement"],
-        ["R7", "Acceso a Datos Sensibles", "Acceso a recursos compartidos conteniendo Finance, Legal, HR", "Medio", "Collection"],
-        ["R8", "Acceso Masivo a Archivos", ">= 10 eventos de lectura en recursos compartidos en menos de 5 min", "Alto", "Collection"],
-        ["R9", "Exfiltración vía Proxy", "Transferencia HTTP POST > 100 MB acumulados en menos de 15 min", "Alto", "Exfiltration"],
-        ["R10", "Doble Extensión / Nombres Sospechosos", "Ejecución de archivos con doble extensión (.pdf.exe) o nombres aleatorios", "Medio", "Defense Evasion"],
-        ["R11", "Persistencia (Servicios / Tareas)", "Creación de servicios (7045) o tareas programadas (4698) en ProgramData/Temp", "Alto", "Persistence"],
-        ["R12", "Balizamiento C2 Periódico", ">= 4 conexiones hacia el mismo destino con fluctuación (jitter) < 10%", "Alto", "Command and Control"],
-        ["R13", "Web Shell y Sondeo Web", "Peticiones a .aspx/.php con parámetros cmd= o > 10 sondeos en 5 min", "Alto", "Persistence / Initial Access"],
-        ["R14", "Anomalía en Calidad de Datos", "Discrepancias de formato (DC01 vs DC-01, svc_backup) o corrupción de logs", "Bajo", "Operacional"],
+        ["R1", "Password Spraying", ">= 10 fallos (EID 4625), >= 5 usuarios distintos en 15 min desde IP externa", "Medio", "Credential Access"],
+        ["R2", "Fuerza Bruta (Logon/RDP)", ">= 3 fallos (EID 4625) en 10 min sobre el mismo usuario/host desde IP externa", "Medio", "Credential Access"],
+        ["R3", "Cuenta Comprometida tras Ataque", "Logon exitoso (EID 4624) dentro de 30 min tras evento R1 o R2", "Alto", "Initial Access"],
+        ["R4", "Privilegios en Sesión Comprometida", "4672 en sesión de cuenta comprometida", "Alto", "Privilege Escalation"],
+        ["R5", "LOLBins y Comandos Sospechosos", "Invocación de -EncodedCommand, vssadmin delete, tar/7z, whoami, net view o shell bajo IIS", "Alto", "Execution / Impact"],
+        ["R6", "Movimiento Lateral (RDP/SMB)", "Logon Tipo 10 (RDP) desde IP externa o Tipo 3 (SMB) por cuenta comprometida", "Alto / Medio", "Lateral Movement"],
+        ["R7", "Acceso a Compartidos Sensibles", "Acceso (EID 5140/5145) a shares con Finance, Legal, HR o Confidential", "Alto / Medio", "Collection"],
+        ["R8", "Acceso Masivo a Archivos", "Acceso masivo >= 10 objetos 4663 en 5 min", "Medio", "Discovery / Collection"],
+        ["R9", "Exfiltración Masiva por Proxy", "Transferencia HTTP POST con suma bytes_out >= 100 MB en 15 min", "Alto", "Exfiltration"],
+        ["R10", "Conexión C2 / Exfiltración Saliente", "5156 saliente a IP externa por powershell/cmd, T1041 Exfiltration", "Alto", "Exfiltration / C2"],
+        ["R11", "Persistencia (Tareas / Servicios)", "Creación de tarea (EID 4698) o servicio (EID 7045) en rutas de usuario/temp", "Alto", "Persistence"],
+        ["R12", "Balizamiento C2 Periódico", "Mismo proceso ejecutado >= 4 veces con jitter < 10%, T1071", "Alto", "Command and Control"],
+        ["R13", "Web Shell y Sondeo Web", "Peticiones a .aspx/.php con cmd= o >= 10 sondeos a /admin|/login|/api en 5 min", "Alto / Medio", "Initial Access / Persistence"],
+        ["R14", "Anomalía en Calidad de Datos", "Colisión de hostnames normalizados (DC01/DC-01) o cuentas permutadas", "Bajo", "Operacional"],
     ],
 }
 
