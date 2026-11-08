@@ -271,9 +271,9 @@ def build_pdf(df, incidents, iocs, sha256, analyst="Sebastian Szostak") -> bytes
         ["Cliente / Entidad:", METADATA["CLIENT"]],
         ["Organismo Investigador:", METADATA["ORGANIZATION"]],
         ["Analista SOC L2 a Cargo:", analyst],
-        ["Fecha de Emision del Informe:", datetime.now().strftime("%d de noviembre de 2026")],
+        ["Fecha de Emisión del Informe:", datetime.now().strftime("%d de noviembre de 2026")],
         ["Estado Operacional de la Amenaza:", EXECUTIVE_SUMMARY["SECTION_1_2_STATUS"]],
-        ["Resumen SHA-256 de Telemetria:", sha256],
+        ["Resumen SHA-256 de Telemetría:", sha256],
     ]
     report.set_font(font_family, "", 9)
     report.set_draw_color(210, 215, 225)
@@ -297,7 +297,7 @@ def build_pdf(df, incidents, iocs, sha256, analyst="Sebastian Szostak") -> bytes
         ("Incidentes Detectados", f"{incident_count}"),
         ("Hosts Afectados", f"{host_count}"),
         ("IPs Atacantes Externas", f"{ip_count}"),
-        ("Exfiltracion Estimada", f"~{total_mb_approx:.0f} MB"),
+        ("Exfiltración Estimada", f"~{total_mb_approx:.0f} MB"),
     ]
 
     kw = 28
@@ -320,9 +320,9 @@ def build_pdf(df, incidents, iocs, sha256, analyst="Sebastian Szostak") -> bytes
     report.set_font(font_family, "I", 7.5)
     report.set_text_color(120, 130, 140)
     aviso_conf = (
-        "AVISO DE CONFIDENCIALIDAD: Este documento contiene informacion forense clasificada como TLP:AMBER. "
-        "Su distribucion esta estrictamente limitada a los miembros autorizados del equipo de ciberseguridad, "
-        "direccion tecnica y asesoria juridica del operador energetico. Queda prohibida su reproduccion parcial o total."
+        "AVISO DE CONFIDENCIALIDAD: Este documento contiene información forense clasificada como TLP:AMBER. "
+        "Su distribución está estrictamente limitada a los miembros autorizados del equipo de ciberseguridad, "
+        "dirección técnica y asesoría jurídica del operador energético. Queda prohibida su reproducción parcial o total."
     )
     report.multi_cell(180, 4, _s(aviso_conf), align="C")
 
@@ -431,9 +431,9 @@ def build_pdf(df, incidents, iocs, sha256, analyst="Sebastian Szostak") -> bytes
     report.ln(3)
     add_h2(TECHNICAL_SUMMARY["SECTION_2_3_TITLE"])
     add_p(
-        "A continuacion se desglosa la secuencia cronologica completa de eventos maliciosos agrupados "
-        "por incidente, indicando el identificador unico de registro (Log_ID), marca temporal, host afectado, "
-        "cuenta utilizada, Event ID de telemetria, detalle de la linea de comando o solicitud, y severidad asignada."
+        "A continuación se desglosa la secuencia cronológica completa de eventos maliciosos agrupados "
+        "por incidente, indicando el identificador único de registro (Log_ID), marca temporal, host afectado, "
+        "cuenta utilizada, Event ID de telemetría, detalle de la línea de comando o solicitud, y severidad asignada."
     )
 
     for inc in incidents:
@@ -470,9 +470,9 @@ def build_pdf(df, incidents, iocs, sha256, analyst="Sebastian Szostak") -> bytes
     report.add_page()
     add_h2(TECHNICAL_SUMMARY["SECTION_2_4_TITLE"])
     add_p(
-        "Mapeo exhaustivo de las tecnicas de ataque observadas en la investigacion contra la matriz MITRE "
-        "ATT&CK Enterprise v14, desglosando la tactica, identificador de tecnica, nombre canonico, "
-        "incidentes donde se manifesto y los identificadores Log_ID que constituyen la evidencia forense."
+        "Mapeo exhaustivo de las técnicas de ataque observadas en la investigación contra la matriz MITRE "
+        "ATT&CK Enterprise v14, desglosando la táctica, identificador de técnica, nombre canónico, "
+        "incidentes donde se manifestó y los identificadores Log_ID que constituyen la evidencia forense."
     )
 
     # Construccion dinamica de la matriz MITRE
@@ -523,8 +523,8 @@ def build_pdf(df, incidents, iocs, sha256, analyst="Sebastian Szostak") -> bytes
     report.ln(2)
     add_h2(TECHNICAL_SUMMARY["SECTION_2_5_TITLE"])
     add_p(
-        "Consolidacion de artefactos e indicadores de compromiso (IoCs) extraidos del analisis de eventos, "
-        "clasificados por categoria operativa para su ingestion en sistemas SIEM, EDR y pasarelas perimetrales."
+        "Consolidación de artefactos e indicadores de compromiso (IoCs) extraídos del análisis de eventos, "
+        "clasificados por categoría operativa para su ingestión en sistemas SIEM, EDR y pasarelas perimetrales."
     )
 
     with report.table(
@@ -564,7 +564,7 @@ def build_pdf(df, incidents, iocs, sha256, analyst="Sebastian Szostak") -> bytes
     add_h2(TECHNICAL_SUMMARY["SECTION_2_6_TITLE"])
     add_p(TECHNICAL_SUMMARY["ACH_INTRO"])
 
-    add_h3("Definicion de Hipotesis Competitivas:")
+    add_h3("Definición de Hipótesis Competitivas:")
     for h_code, h_desc in TECHNICAL_SUMMARY["ACH_HYPOTHESES"].items():
         report.set_font(font_family, "B", 8)
         report.cell(10, 4.5, _s(f"{h_code}:"), border=0)
@@ -573,7 +573,7 @@ def build_pdf(df, incidents, iocs, sha256, analyst="Sebastian Szostak") -> bytes
         report.ln(0.5)
 
     report.ln(2)
-    add_h3("Matriz de Evaluacion de Evidencia vs Hipotesis (ACH):")
+    add_h3("Matriz de Evaluación de Evidencia vs Hipótesis (ACH):")
     with report.table(
         col_widths=(75, 35, 35, 35),
         headings_style=table_head_style,
@@ -597,8 +597,8 @@ def build_pdf(df, incidents, iocs, sha256, analyst="Sebastian Szostak") -> bytes
     report.ln(2)
     add_h2(TECHNICAL_SUMMARY["SECTION_2_7_TITLE"])
     add_p(
-        "A continuacion se documentan las brechas de visibilidad identificadas durante el analisis forense, "
-        "acompanadas de precisiones analiticas criticas sobre asignacion de privilegios y vectores de compromiso."
+        "A continuación se documentan las brechas de visibilidad identificadas durante el análisis forense, "
+        "acompañadas de precisiones analíticas críticas sobre asignación de privilegios y vectores de compromiso."
     )
 
     for gap_title, gap_desc in TECHNICAL_SUMMARY["VISIBILITY_GAPS"]:
@@ -619,8 +619,8 @@ def build_pdf(df, incidents, iocs, sha256, analyst="Sebastian Szostak") -> bytes
     report.add_page()
     add_h2(TECHNICAL_SUMMARY["SECTION_2_8_TITLE"])
     add_p(
-        "Playbook operacional de ejecucion inmediata para el equipo de respuesta a incidentes (IR / SecOps), "
-        "con mandatos y comandos tecnicos ejecutables precisos por vector e incidente identificado."
+        "Playbook operacional de ejecución inmediata para el equipo de respuesta a incidentes (IR / SecOps), "
+        "con mandatos y comandos técnicos ejecutables precisos por vector e incidente identificado."
     )
 
     with report.table(

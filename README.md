@@ -264,7 +264,7 @@ El proyecto cuenta con una suite completa de pruebas unitarias y de integración
 4. `test_anchor_events_severity_alto`: Asegura que los 10 eventos ancla críticos del ataque estén clasificados indefectiblemente como `Alto`.
 5. `test_affected_hosts_and_external_ips`: Certifica la identificación de los 7 hosts afectados y las 5 direcciones IP externas en la tabla de IoCs.
 6. `test_r14_data_quality_anomalies`: Confirma que `DC01` y `CORP\svc_backup` sean clasificados en severidad `Bajo` y excluidos de los incidentes de intrusión.
-7. `test_no_hardcoded_ground_truth_in_detections`: Inspecciona el código fuente de `detections.py` para garantizar la ausencia total de identificadores de prueba (`EVT-`), IPs u hostnames hardcodeados en la lógica algorítmica.
+7. `test_anti_hardcode_detections_source`: Inspecciona el código fuente de `detections.py` para garantizar la ausencia total de identificadores de prueba (`EVT-`), IPs u hostnames hardcodeados en la lógica algorítmica.
 
 ---
 
