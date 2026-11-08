@@ -298,7 +298,7 @@ def build_pdf(df, incidents, iocs, sha256, analyst="Sebastian Szostak") -> bytes
         ("Incidentes Detectados", f"{incident_count}"),
         ("Hosts Afectados", f"{host_count}"),
         ("IPs Atacantes Externas", f"{ip_count}"),
-        ("Exfiltración Estimada", f"~{total_mb_approx:.0f} MB"),
+        ("Volumen Saliente", f"~{total_mb_approx:.0f} MB"),
     ]
 
     kw = 28

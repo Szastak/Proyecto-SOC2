@@ -296,8 +296,8 @@ def render_kpis(k: Dict[str, Any]):
         "Activos con eventos dentro de algún incidente.")
     kpi(c[4], "kpi-amber-ips", "IPs externas", f"{k['ips']}",
         "IPs públicas de origen o destino en incidentes.")
-    kpi(c[5], "kpi-red-exf", "Exfiltrado", f"~{k['mb_out']:.0f} MB",
-        f"{k['bytes_out']:,} bytes enviados en eventos de incidentes (MB decimales).")
+    kpi(c[5], "kpi-red-exf", "Volumen saliente", f"~{k['mb_out']:.0f} MB",
+        f"{k['bytes_out']:,} bytes_out registrados en proxy HTTP POST (posible exfiltración no confirmada).")
 
 
 def render_resumen(df, incidents, k, gemini_key):

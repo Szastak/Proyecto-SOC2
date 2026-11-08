@@ -969,7 +969,7 @@ def run_detections(df: pd.DataFrame):
                 f"afectando a {', '.join(hosts)}, que culmina en una autenticación exitosa y una sesión con privilegios sensibles (4672)."
             )
         elif "Lateral Movement" in dominant_tactic or "Credential Access" in dominant_tactic:
-            titulo = "Fuerza bruta RDP, intrusión y movimiento lateral con exfiltración"
+            titulo = "Fuerza bruta RDP, intrusión y movimiento lateral con posible exfiltración (no confirmada)"
             resumen = (
                 f"Intrusión remota mediante fuerza bruta RDP hacia {', '.join(hosts)}, seguida de "
                 f"reconocimiento interno, desplazamiento lateral y conexión hacia infraestructura externa."
@@ -982,10 +982,10 @@ def run_detections(df: pd.DataFrame):
             )
         elif "Exfiltration" in dominant_tactic:
             total_mb = sub_df["bytes_out"].sum() / 1_000_000
-            titulo = "Exfiltración masiva de documentos confidenciales vía proxy"
+            titulo = "Posible exfiltración de documentos vía proxy (bytes_out, no confirmada)"
             resumen = (
-                f"Empaquetado y transferencia masiva de archivos protegidos hacia servidor externo "
-                f"a través de solicitudes HTTP POST que suman aproximadamente {total_mb:.0f} MB."
+                f"Empaquetado de archivos protegidos y solicitudes HTTP POST salientes "
+                f"que suman aproximadamente {total_mb:.0f} MB registrados en bytes_out (posible exfiltración, no confirmada)."
             )
         elif "Command and Control" in dominant_tactic or "Persistence" in dominant_tactic:
             titulo = "Persistencia mediante tarea programada y servicio con balizamiento C2"

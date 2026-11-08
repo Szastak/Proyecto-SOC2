@@ -35,7 +35,7 @@ EXECUTIVE_SUMMARY = {
         "(DC-01, APP-SRV01, FS-SRV01, WEB-01, WS-018, WS-023 y WS-031). Los vectores incluyeron ataques "
         "externos de password spraying sobre controladores de dominio, intrusiones remotas vía fuerza bruta "
         "RDP, explotación de servidores web expuestos mediante web shells, desplazamiento lateral hacia servidores "
-        "de archivos, exfiltración masiva de información sensible (~253 MB) y ejecución de comandos destructivos "
+        "de archivos, posible exfiltración con un volumen saliente registrado (bytes_out) de ~253 MB (no confirmada con la telemetría del SIEM) y ejecución de comandos destructivos "
         "destinados a eliminar instantáneas de volumen (Volume Shadow Copies) como preparación previa a ransomware."
     ),
     "SECTION_1_2_TITLE": "1.2 Estado de la Amenaza",
@@ -51,12 +51,12 @@ EXECUTIVE_SUMMARY = {
     "SECTION_1_3_TITLE": "1.3 Impacto en el Negocio",
     "SECTION_1_3_ITEMS": [
         (
-            "Envío Confirmado de ~253 MB tras Comprimir Documentos Legales",
-            "Envío confirmado de ~253 MB hacia un servidor externo tras comprimir documentos legales (el contenido "
-            "exacto no se puede verificar con la telemetría), atribuido exclusivamente al incidente INC-04 (cuenta CORP\\rrojas "
-            "desde \\FS-SRV01\\Legal hacia 198.51.100.88 vía proxy HTTP POST). En el caso de Finanzas (INC-02), la "
-            "telemetría constata una conexión saliente por PowerShell hacia 203.0.113.88:443 pero sin volumen medido. "
-            "Riesgo crítico de fuga de información confidencial y espionaje corporativo.",
+            "Volumen Saliente Registrado (bytes_out) de ~253 MB tras Comprimir Documentos Legales",
+            "Volumen saliente registrado (bytes_out) de ~253 MB hacia un servidor externo tras comprimir documentos legales "
+            "(posible exfiltración no confirmada con la telemetría del SIEM), atribuido al incidente INC-04 (cuenta CORP\\rrojas "
+            "desde \\FS-SRV01\\Legal hacia 198.51.100.88 vía proxy HTTP POST). En el caso de Finanzas (INC-02), el "
+            "SIEM registra una conexión saliente por PowerShell hacia 203.0.113.88:443 pero sin volumen medido. "
+            "Riesgo de posible exposición de información confidencial y espionaje corporativo.",
         ),
         (
             "Borrado de Instantáneas Pre-Ransomware",
@@ -79,7 +79,7 @@ EXECUTIVE_SUMMARY = {
     "SECTION_1_4_TITLE": "1.4 Cumplimiento Normativo: RGPD y Directiva NIS2",
     "SECTION_1_4_RGPD": (
         "Notificación RGPD (Artículo 33):\n"
-        "La evidencia forense constata la exfiltración exitosa de documentos corporativos sensibles que incluyen "
+        "La telemetría registra el acceso, empaquetado y posible exfiltración (no confirmada con la telemetría del SIEM) de documentos corporativos sensibles que incluyen "
         "datos de recursos humanos, contratos legales y transacciones financieras vinculadas a personas físicas identificables. "
         "De conformidad con el Artículo 33 del Reglamento General de Protección de Datos (RGPD / GDPR), la entidad tiene la "
         "obligación legal de notificar la brecha de seguridad a la Autoridad de Protección de Datos de Suecia "
@@ -152,9 +152,9 @@ EXECUTIVE_SUMMARY = {
         ],
         [
             "INC-04",
-            "Exfiltración masiva de documentos confidenciales vía proxy",
+            "Posible exfiltración de documentos vía proxy (bytes_out, no confirmada)",
             "Crítico",
-            "Envío confirmado de ~253 MB hacia un servidor externo tras comprimir documentos legales (el contenido exacto no se puede verificar con la telemetría).",
+            "Volumen saliente registrado (bytes_out) de ~253 MB hacia un servidor externo tras comprimir documentos legales (posible exfiltración no confirmada con la telemetría del SIEM).",
         ],
         [
             "INC-05",
@@ -284,7 +284,7 @@ TECHNICAL_SUMMARY = {
         "3. Comportamiento Estanco de Cuentas: La identidad 'mgarcia' queda inerte tras las 08:40. En paralelo, 'backupsvc' y 'rrojas' "
         "aparecen en fases posteriores en hosts diferentes sin trazas de movimiento lateral cruzado entre dichas cuentas.\n"
         "4. Perfil Operacional Heterogéneo: Coexisten técnicas típicas de ransomware oportunista (eliminación ruidosa de vssadmin), "
-        "ciberespionaje/fuga de datos (exfiltración silenciosa vía proxy de Legal/Finanzas) y explotación perimetral web clásica (web shell)."
+        "ciberespionaje/posible exfiltración de datos (volumen saliente vía proxy desde Legal/Finanzas, no confirmada con la telemetría del SIEM) y explotación perimetral web clásica (web shell)."
     ),
     "ACH_CONCLUSION_TEXT": (
         "Conclusión Analítica:\n"
@@ -373,7 +373,7 @@ TECHNICAL_SUMMARY = {
             (
                 "1. Bloquear IP de origen RDP:\n"
                 "   New-NetFirewallRule -DisplayName 'Block-Attacker-198.51.100.77' -Direction Inbound -Action Block -RemoteAddress 198.51.100.77\n"
-                "2. Bloquear conexión saliente de exfiltración:\n"
+                "2. Bloquear conexión saliente sospechosa (posible exfiltración):\n"
                 "   New-NetFirewallRule -DisplayName 'Block-Outbound-203.0.113.88' -Direction Outbound -Action Block -RemoteAddress 203.0.113.88\n"
                 "3. Deshabilitar y resetear contraseña de cuenta admin:\n"
                 "   Disable-ADAccount -Identity 'admin'; Set-ADAccountPassword -Identity 'admin' -Reset\n"
@@ -395,8 +395,8 @@ TECHNICAL_SUMMARY = {
             ),
         ],
         [
-            "INC-04 (Exfiltración Proxy / WS-018)",
-            "Interrupción de Canal de Fuga y Saneamiento de Cuentas",
+            "INC-04 (Posible Exfiltración Proxy / WS-018)",
+            "Interrupción de Canal Saliente y Saneamiento de Cuentas",
             (
                 "1. Bloquear destino proxy en pasarela perimetral:\n"
                 "   Set-ProxyBlockRule -Destination '198.51.100.88' -Action Deny\n"

@@ -43,8 +43,8 @@ Durante una ventana de observación de aproximadamente 6 horas (**2026-10-23 de 
 | **Eventos Maliciosos Confirmados** | **121** | Eventos clasificados en severidad SOC **Alto** o **Medio** tras correlación contextual. |
 | **Incidentes Correlacionados** | **6** | Cadenas de ataque independientes estructuradas mediante clustering analítico. |
 | **Activos / Hosts Comprometidos** | **7** | `DC-01`, `APP-SRV01`, `FS-SRV01`, `WEB-01`, `WS-018`, `WS-023` y `WS-031`. |
-| **Direcciones IP Externas (IoCs)** | **5** | 3 IPs de ataque perimetral y 2 IPs de destino de comando y control / exfiltración. |
-| **Volumen Total Exfiltrado** | **~253 MB** | **253.305.558 bytes** transferidos mediante solicitudes HTTP POST salientes. |
+| **Direcciones IP Externas (IoCs)** | **5** | 3 IPs de ataque perimetral y 2 IPs de destino de comando y control / posible exfiltración. |
+| **Volumen Saliente Registrado (`bytes_out`)** | **~253 MB** | **253.305.558 bytes** registrados en solicitudes HTTP POST salientes (posible exfiltración no confirmada con la telemetría del SIEM). |
 | **Resumen SHA-256 de Telemetría** | `f645d768...` | Integridad criptográfica verificada: `f645d76800097c09f3102d7d4f1cb5c1b2bb286d6cd054ab3daabe62c69d85f0`. |
 | **Estado Operacional de la Amenaza** | **Activa** | Calificada como *Activa hasta confirmar contención* debido a artefactos durmientes. |
 
@@ -89,9 +89,9 @@ El motor de correlación identificó un total de **6 incidentes de seguridad** d
 | Incidente | Título Operativo | Ventana Temporal | Hosts Afectados | Cuentas Involucradas | Eventos Maliciosos | Técnicas MITRE ATT&CK |
 | :---: | :--- | :---: | :--- | :--- | :---: | :--- |
 | **INC-01** | **Password Spraying y Compromiso de Cuenta Privilegiada** | 08:25:00 – 08:40:00 | `DC-01`, `WS-031` | `CORP\mgarcia` (comprometida) + 7 cuentas objetivo sin éxito | **35** | **T1110.003**, **T1110.001**, **T1078**, **T1078.003** |
-| **INC-02** | **Fuerza Bruta RDP, Intrusión y Movimiento Lateral con Exfiltración** | 09:02:00 – 09:21:00 | `APP-SRV01`, `FS-SRV01` | `CORP\admin` | **15** | **T1110.001**, **T1078**, **T1078.003**, **T1021.001**, **T1021.002**, **T1059.001**, **T1069.001**, **T1135**, **T1039**, **T1560.001**, **T1041** |
+| **INC-02** | **Fuerza Bruta RDP, Intrusión y Movimiento Lateral con Posible Exfiltración (No Confirmada)** | 09:02:00 – 09:21:00 | `APP-SRV01`, `FS-SRV01` | `CORP\admin` | **15** | **T1110.001**, **T1078**, **T1078.003**, **T1021.001**, **T1021.002**, **T1059.001**, **T1069.001**, **T1135**, **T1039**, **T1560.001**, **T1041** |
 | **INC-03** | **Actividad Previa a Ransomware y Borrado de Copias Shadow** | 09:36:00 – 09:42:00 | `FS-SRV01`, `WS-023` | `CORP\backupsvc` | **18** | **T1059.001**, **T1083**, **T1490** |
-| **INC-04** | **Exfiltración Masiva de Documentos Confidenciales vía Proxy** | 10:40:00 – 10:49:18 | `FS-SRV01`, `WS-018` | `CORP\rrojas` | **24** | **T1039**, **T1560.001**, **T1048.002** |
+| **INC-04** | **Posible Exfiltración de Documentos vía Proxy (bytes_out, No Confirmada)** | 10:40:00 – 10:49:18 | `FS-SRV01`, `WS-018` | `CORP\rrojas` | **24** | **T1039**, **T1560.001**, **T1048.002** |
 | **INC-05** | **Persistencia mediante Tarea Programada y Servicio con Balizamiento C2** | 11:37:00 – 12:04:00 | `APP-SRV01` | `CORP\helpdesk` | **7** | **T1053.005**, **T1543.003**, **T1071.001** |
 | **INC-06** | **Compromiso de Servidor Web por Web Shell y Ejecución Remota** | 12:10:00 – 12:15:00 | `WEB-01` | `IIS APPPOOL\DefaultAppPool` | **22** | **T1190**, **T1505.003**, **T1033** |
 
@@ -107,7 +107,7 @@ Uno de los aportes metodológicos centrales de esta investigación es la aplicac
 
 En entornos operacionales reales, los registros SIEM etiquetan los eventos de acuerdo con plantillas estáticas de severidad que no contemplan el contexto del adversario. En este dataset, eventos de altísima criticidad e impacto destructivo llegaron catalogados como **"Informational"** o **"Warning"**:
 1. **EVT-00123**: Autenticación exitosa (`Event_ID 4624`) de la cuenta `CORP\mgarcia` desde la IP externa `203.0.113.74` inmediatamente después de un ataque masivo de password spraying -> Clasificado originalmente como *Informational*.
-2. **EVT-00428**: Ejecución de la herramienta `7z.exe` para compactar contratos clasificados (`C:\Legal\*.docx`) previa a la fuga masiva -> Clasificado originalmente como *Informational*.
+2. **EVT-00428**: Ejecución de la herramienta `7z.exe` para compactar contratos clasificados (`C:\Legal\*.docx`) previa a la posible exfiltración por proxy (`bytes_out`) -> Clasificado originalmente como *Informational*.
 3. **EVT-00528, 542, 548, 559, 564**: Ejecución periódica del binario `wuhelper.exe` cada 6 minutos exactos (patrón de beacon; el destino de red no figura en la telemetría) -> Clasificado originalmente como *Informational*.
 4. **EVT-00314**: Invocación de `vssadmin delete shadows /all /quiet` para eliminar instantáneas de volumen -> Clasificado originalmente como *Warning*.
 
@@ -242,7 +242,7 @@ El proyecto cuenta con una suite completa de pruebas unitarias y de integración
 ## 📂 Estructura del Repositorio
 
 ```text
-nordic-shadow-hunter/
+Proyecto-SOC2/
 ├── .gitattributes              # Normalización de fines de línea (LF para scripts bash)
 ├── .gitignore                  # Exclusión de venv, cache, logs y archivos de datos sensibles
 ├── .streamlit/
