@@ -326,6 +326,7 @@ nordic-shadow-hunter/
 1. **Brecha de Visibilidad Perimetral (VPN y Firewall)**: No se dispone de logs de cortafuegos de borde o concentradores VPN, lo que impide correlacionar sesiones externas con autenticación multifactor (MFA) previa a la llegada a los servidores.
 2. **Carencia de Hashes Criptográficos en Endpoints**: La telemetría de Windows Event Log no incluyó la captura de hashes (SHA-256 o MD5) en eventos de creación de procesos (`4688`), al no contar con Sysmon (`Event ID 1`) desplegado.
 3. **Ausencia de Eventos Kerberos**: Carencia de registros `4768` (TGT Request) y `4769` (TGS Request) para auditar ataques de tipo Kerberoasting o Silver Ticket.
+4. **Rangos de Documentación RFC 5737**: Las 5 IPs externas pertenecen a rangos de documentación RFC 5737; el enriquecimiento con threat intel/MISP no arroja coincidencias.
 
 ### Hoja de Ruta y Mejoras Futuras
 - **Conector Nativo de Datos para Microsoft Sentinel**: Ingestión continua mediante Azure Monitor Ingestion API / Data Collection Rules (DCR).

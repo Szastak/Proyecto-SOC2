@@ -260,10 +260,11 @@ def build_pdf(df, incidents, iocs, sha256, analyst="Sebastian Szostak") -> bytes
     report.set_fill_color(217, 119, 6)  # Amber
     report.set_text_color(255, 255, 255)
     report.set_font(font_family, "B", 10)
-    badge_w = 40
+    tlp_text = _s(f"CLASIFICACION {METADATA['CLASSIFICATION']}")
+    badge_w = report.get_string_width(tlp_text) + 10
     badge_x = (210 - badge_w) / 2
     report.set_x(badge_x)
-    report.cell(badge_w, 7, _s(f"CLASIFICACION {METADATA['CLASSIFICATION']}"), fill=True, align="C", new_x="LMARGIN", new_y="NEXT")
+    report.cell(badge_w, 7, tlp_text, fill=True, align="C", new_x="LMARGIN", new_y="NEXT")
 
     report.ln(12)
     # Tabla de metadatos de portada
@@ -357,12 +358,16 @@ def build_pdf(df, incidents, iocs, sha256, analyst="Sebastian Szostak") -> bytes
     add_p(EXECUTIVE_SUMMARY["SECTION_1_4_NIS2"])
 
     add_h2(EXECUTIVE_SUMMARY["SECTION_1_5_TITLE"])
+    report.set_font(font_family, "", 7.5)
+    report.set_text_color(40, 50, 60)
     with report.table(
         col_widths=(24, 96, 35, 25),
         headings_style=table_head_style,
         repeat_headings=1,
         text_align=("CENTER", "LEFT", "LEFT", "CENTER"),
         padding=1.5,
+        cell_fill_color=(255, 255, 255),
+        cell_fill_mode="ALL",
     ) as t_prio:
         r_head = t_prio.row()
         for h in EXECUTIVE_SUMMARY["RECOMMENDED_PRIORITIES_HEADERS"]:
@@ -374,12 +379,16 @@ def build_pdf(df, incidents, iocs, sha256, analyst="Sebastian Szostak") -> bytes
 
     report.ln(2)
     add_h2(EXECUTIVE_SUMMARY["SECTION_1_6_TITLE"])
+    report.set_font(font_family, "", 7.5)
+    report.set_text_color(40, 50, 60)
     with report.table(
         col_widths=(20, 65, 22, 73),
         headings_style=table_head_style,
         repeat_headings=1,
         text_align=("CENTER", "LEFT", "CENTER", "LEFT"),
         padding=1.5,
+        cell_fill_color=(255, 255, 255),
+        cell_fill_mode="ALL",
     ) as t_risk:
         r_head = t_risk.row()
         for h in EXECUTIVE_SUMMARY["RISK_MATRIX_HEADERS"]:
@@ -399,12 +408,16 @@ def build_pdf(df, incidents, iocs, sha256, analyst="Sebastian Szostak") -> bytes
     add_p(TECHNICAL_SUMMARY["SECTION_2_1_TEXT"])
 
     add_h2(TECHNICAL_SUMMARY["SECTION_2_2_TITLE"])
+    report.set_font(font_family, "", 7.5)
+    report.set_text_color(40, 50, 60)
     with report.table(
         col_widths=(18, 50, 32, 28, 25, 27),
         headings_style=table_head_style,
         repeat_headings=1,
         text_align=("CENTER", "LEFT", "LEFT", "LEFT", "LEFT", "LEFT"),
         padding=1.5,
+        cell_fill_color=(255, 255, 255),
+        cell_fill_mode="ALL",
     ) as t_inc:
         r_head = t_inc.row()
         for h in TECHNICAL_SUMMARY["INCIDENTS_TABLE_HEADERS"]:
@@ -438,12 +451,16 @@ def build_pdf(df, incidents, iocs, sha256, analyst="Sebastian Szostak") -> bytes
 
     for inc in incidents:
         add_h3(f"{inc['id']} \u2014 {inc['titulo']} ({len(inc.get('log_ids', []))} Eventos Correlacionados)")
+        report.set_font(font_family, "", 7.2)
+        report.set_text_color(40, 50, 60)
         with report.table(
             col_widths=(18, 28, 20, 22, 14, 64, 14),
             headings_style=table_head_style,
             repeat_headings=1,
             text_align=("CENTER", "LEFT", "LEFT", "LEFT", "CENTER", "LEFT", "CENTER"),
             padding=1.2,
+            cell_fill_color=(255, 255, 255),
+            cell_fill_mode="ALL",
         ) as t_tl:
             r_head = t_tl.row()
             for h in TECHNICAL_SUMMARY["TIMELINE_HEADERS"]:
@@ -504,12 +521,16 @@ def build_pdf(df, incidents, iocs, sha256, analyst="Sebastian Szostak") -> bytes
 
     mitre_rows.sort(key=lambda x: (x[0], x[2]))
 
+    report.set_font(font_family, "", 7.5)
+    report.set_text_color(40, 50, 60)
     with report.table(
         col_widths=(32, 48, 20, 26, 54),
         headings_style=table_head_style,
         repeat_headings=1,
         text_align=("LEFT", "LEFT", "CENTER", "LEFT", "LEFT"),
         padding=1.5,
+        cell_fill_color=(255, 255, 255),
+        cell_fill_mode="ALL",
     ) as t_mitre:
         r_head = t_mitre.row()
         for h in TECHNICAL_SUMMARY["MITRE_HEADERS"]:
@@ -527,12 +548,16 @@ def build_pdf(df, incidents, iocs, sha256, analyst="Sebastian Szostak") -> bytes
         "clasificados por categoría operativa para su ingestión en sistemas SIEM, EDR y pasarelas perimetrales."
     )
 
+    report.set_font(font_family, "", 7.2)
+    report.set_text_color(40, 50, 60)
     with report.table(
         col_widths=(26, 42, 50, 18, 22, 22),
         headings_style=table_head_style,
         repeat_headings=1,
         text_align=("LEFT", "LEFT", "LEFT", "CENTER", "LEFT", "LEFT"),
         padding=1.2,
+        cell_fill_color=(255, 255, 255),
+        cell_fill_mode="ALL",
     ) as t_iocs:
         r_head = t_iocs.row()
         for h in TECHNICAL_SUMMARY["IOC_TABLE_HEADERS"]:
@@ -574,12 +599,16 @@ def build_pdf(df, incidents, iocs, sha256, analyst="Sebastian Szostak") -> bytes
 
     report.ln(2)
     add_h3("Matriz de Evaluación de Evidencia vs Hipótesis (ACH):")
+    report.set_font(font_family, "", 7.5)
+    report.set_text_color(40, 50, 60)
     with report.table(
         col_widths=(75, 35, 35, 35),
         headings_style=table_head_style,
         repeat_headings=1,
         text_align=("LEFT", "CENTER", "CENTER", "CENTER"),
         padding=1.5,
+        cell_fill_color=(255, 255, 255),
+        cell_fill_mode="ALL",
     ) as t_ach:
         r_head = t_ach.row()
         for h in TECHNICAL_SUMMARY["ACH_EVIDENCE_HEADERS"]:
@@ -623,12 +652,16 @@ def build_pdf(df, incidents, iocs, sha256, analyst="Sebastian Szostak") -> bytes
         "con mandatos y comandos técnicos ejecutables precisos por vector e incidente identificado."
     )
 
+    report.set_font(font_family, "", 7.5)
+    report.set_text_color(40, 50, 60)
     with report.table(
         col_widths=(35, 45, 100),
         headings_style=table_head_style,
         repeat_headings=1,
         text_align=("LEFT", "LEFT", "LEFT"),
         padding=1.5,
+        cell_fill_color=(255, 255, 255),
+        cell_fill_mode="ALL",
     ) as t_pb:
         r_head = t_pb.row()
         for h in TECHNICAL_SUMMARY["PLAYBOOK_HEADERS"]:
@@ -643,12 +676,16 @@ def build_pdf(df, incidents, iocs, sha256, analyst="Sebastian Szostak") -> bytes
     # ==========================================================================
     report.add_page()
     add_h1(ANNEX_A["TITLE"])
+    report.set_font(font_family, "", 7.5)
+    report.set_text_color(40, 50, 60)
     with report.table(
         col_widths=(14, 38, 70, 18, 40),
         headings_style=table_head_style,
         repeat_headings=1,
         text_align=("CENTER", "LEFT", "LEFT", "CENTER", "LEFT"),
         padding=1.4,
+        cell_fill_color=(255, 255, 255),
+        cell_fill_mode="ALL",
     ) as t_r:
         r_head = t_r.row()
         for h in ANNEX_A["HEADERS"]:
@@ -660,12 +697,16 @@ def build_pdf(df, incidents, iocs, sha256, analyst="Sebastian Szostak") -> bytes
 
     report.ln(4)
     add_h1(ANNEX_B["TITLE"])
+    report.set_font(font_family, "", 7.5)
+    report.set_text_color(40, 50, 60)
     with report.table(
         col_widths=(22, 28, 55, 75),
         headings_style=table_head_style,
         repeat_headings=1,
         text_align=("CENTER", "LEFT", "LEFT", "LEFT"),
         padding=1.4,
+        cell_fill_color=(255, 255, 255),
+        cell_fill_mode="ALL",
     ) as t_glo:
         r_head = t_glo.row()
         for h in ANNEX_B["HEADERS"]:

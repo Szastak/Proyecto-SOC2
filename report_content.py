@@ -51,10 +51,12 @@ EXECUTIVE_SUMMARY = {
     "SECTION_1_3_TITLE": "1.3 Impacto en el Negocio",
     "SECTION_1_3_ITEMS": [
         (
-            "Exfiltración Confidencial (~253 MB)",
-            "Transferencia masiva no autorizada de documentación clasificada de las áreas de Finanzas y Asuntos "
-            "Legales (\\FS-SRV01\\Finance y \\FS-SRV01\\Legal) hacia servidores externos a través de solicitudes HTTP POST "
-            "acumulando ~253 MB. Riesgo crítico de espionaje industrial, fuga de propiedad intelectual y daño reputacional.",
+            "Envío Confirmado de ~253 MB tras Comprimir Documentos Legales",
+            "Envío confirmado de ~253 MB hacia un servidor externo tras comprimir documentos legales (el contenido "
+            "exacto no se puede verificar con la telemetría), atribuido exclusivamente al incidente INC-04 (cuenta CORP\\rrojas "
+            "desde \\FS-SRV01\\Legal hacia 198.51.100.88 vía proxy HTTP POST). En el caso de Finanzas (INC-02), la "
+            "telemetría constata una conexión saliente por PowerShell hacia 203.0.113.88:443 pero sin volumen medido. "
+            "Riesgo crítico de fuga de información confidencial y espionaje corporativo.",
         ),
         (
             "Borrado de Instantáneas Pre-Ransomware",
@@ -88,7 +90,7 @@ EXECUTIVE_SUMMARY = {
         "Directiva NIS2 (Operador Esencial del Sector Energético):\n"
         "Al tratarse de una entidad del sector de la energía catalogada como Operador Esencial bajo la Directiva NIS2 "
         "(Directiva UE 2022/2555), rigen los plazos estrictos de notificación obligatoria de incidentes significativos:\n"
-        "  1. Alerta Temprana (24 horas): Emisión de una alerta temprana ante la autoridad competente (MSB / CSIRT Nacional de Suecia) "
+        "  1. Alerta Temprana (24 horas): Emisión de una alerta temprana ante la autoridad competente en Suecia, CERT-SE (NCSC/FRA), "
         "dentro de las 24 horas siguientes al conocimiento del incidente con sospecha de intencionalidad o impacto transfronterizo.\n"
         "  2. Notificación de Incidente (72 horas): Actualización con evaluación inicial de gravedad, consecuencias e indicadores de compromiso.\n"
         "  3. Informe Final (1 mes): Entrega de reporte técnico y forense exhaustivo con causas raíz, medidas mitigadoras e impacto cuantificado."
@@ -104,13 +106,13 @@ EXECUTIVE_SUMMARY = {
         ],
         [
             "P2 (Crítica)",
-            "Revocación inmediata de tokens y reseteo de contraseñas de cuentas vulneradas (mgarcia, backupsvc, rrojas, admin); remoción de privilegios de admin local a mgarcia en WS-031.",
+            "Revocación inmediata de tokens y reseteo de contraseñas de cuentas vulneradas (mgarcia, backupsvc, rrojas, admin, helpdesk, IIS APPPOOL\\DefaultAppPool); remoción de privilegios de admin local a mgarcia en WS-031.",
             "Identity / SysAdmin",
             "< 4 horas",
         ],
         [
             "P3 (Regulatoria)",
-            "Emisión de Alerta Temprana NIS2 ante el CSIRT Nacional (MSB) y preparación de la notificación formal ante IMY por brecha de datos personales RGPD Art. 33.",
+            "Emisión de Alerta Temprana NIS2 ante CERT-SE (NCSC/FRA) y preparación de la notificación formal ante IMY por brecha de datos personales RGPD Art. 33.",
             "DPO / Legal / CISO",
             "< 24 h (NIS2) / < 72 h (RGPD)",
         ],
@@ -152,7 +154,7 @@ EXECUTIVE_SUMMARY = {
             "INC-04",
             "Exfiltración masiva de documentos confidenciales vía proxy",
             "Crítico",
-            "Fuga comprobada de ~253 MB de contratos legales y registros financieros hacia servidor externo.",
+            "Envío confirmado de ~253 MB hacia un servidor externo tras comprimir documentos legales (el contenido exacto no se puede verificar con la telemetría).",
         ],
         [
             "INC-05",
@@ -188,7 +190,8 @@ TECHNICAL_SUMMARY = {
         "  4. Taxonomía MITRE ATT&CK: Mapeo de eventos contra técnicas y tácticas de la matriz Enterprise v14.\n"
         "  5. Extracción de IoCs: Consolidación de direcciones IP externas, identidades vulneradas, nombres de host, rutas y artefactos.\n"
         "Limitaciones: La telemetría provista carece de logs de cortafuegos de borde, registros de VPN, eventos de autenticación "
-        "Kerberos (4768/4769) y hashes criptográficos en creación de procesos (Sysmon EID 1)."
+        "Kerberos (4768/4769) y hashes criptográficos en creación de procesos (Sysmon EID 1). "
+        "Asimismo, las 5 IPs externas pertenecen a rangos de documentación RFC 5737; el enriquecimiento con threat intel/MISP no arroja coincidencias."
     ),
     "SECTION_2_2_TITLE": "2.2 Resumen Consolidado de Incidentes",
     "INCIDENTS_TABLE_HEADERS": ["ID", "Título", "Ventana Temporal", "Hosts Afectados", "Cuentas", "Técnicas MITRE"],
@@ -265,7 +268,7 @@ TECHNICAL_SUMMARY = {
             "Consistente (+)",
         ],
         [
-            "Ausencia total de volcado de credenciales en memoria (LSASS/Mimikatz) en la estación WS-031 tras el acceso",
+            "Sin evidencia de volcado de credenciales (no hay telemetría EDR/Sysmon) en memoria (LSASS/Mimikatz) en la estación WS-031 tras el acceso",
             "Inconsistente (-)",
             "Consistente (+)",
             "Consistente (+)",
@@ -316,16 +319,17 @@ TECHNICAL_SUMMARY = {
         ),
         (
             "Falta de Integración con Inteligencia de Amenazas (CTI / MISP)",
-            "Se detecta una dependencia exclusiva de telemetría interna sin contraste automatizado contra fuentes de CTI de la industria "
-            "energética europea (recomiéndase integración formal con plataforma MISP y feeds del CSIRT sectorial).",
+            "Se detecta una dependencia exclusiva de telemetría interna. Las 5 IPs externas pertenecen a rangos de "
+            "documentación RFC 5737; el enriquecimiento con threat intel/MISP no arroja coincidencias "
+            "(recomiéndase integración formal con plataforma MISP y feeds del CSIRT sectorial).",
         ),
     ],
     "NOTE_EVENT_4672": (
         "Aclaración Técnica Fundamental sobre Evento 4672 (mgarcia):\n"
         "El registro del Event ID 4672 ('Special privileges assigned to new logon') para la cuenta mgarcia en la máquina WS-031 "
-        "NO constituyó una escalada técnica de privilegios durante la sesión. El análisis forense confirma que la cuenta mgarcia "
-        "YA pertenecía previamente al grupo local de Administradores de la estación de trabajo, representando una violación directa "
-        "del Principio de Menor Privilegio (Least Privilege) en la política de estaciones de usuario corporativas."
+        "NO constituyó una escalada técnica de privilegios durante la sesión. El análisis forense indica que la cuenta ya tenía "
+        "privilegios sensibles en WS-031, representando una violación directa del Principio de Menor Privilegio (Least Privilege) "
+        "en la política de estaciones de usuario corporativas."
     ),
     "BACKUPSVC_INITIAL_VECTOR": (
         "Vector Inicial de Compromiso de backupsvc:\n"

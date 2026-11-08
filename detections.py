@@ -1062,14 +1062,33 @@ def run_detections(df: pd.DataFrame):
 
         # 2. Cuentas Comprometidas o Sospechosas
         for u in inc["usuarios"]:
+            u_events = sub_df[sub_df["User"] == u]
+            has_success = bool(
+                (
+                    u_events["Event_ID"].isin(["4624", "4672"])
+                    | u_events["Result"].isin(["Success", "Allowed", 200, "200"])
+                ).any()
+            )
+            # En INC-01 (spraying), solo la cuenta con logon exitoso es comprometida; el resto son objetivo
+            if inc_id == "INC-01":
+                if has_success:
+                    t_tipo = "Cuenta Comprometida"
+                    t_ctx = f"Identidad comprometida tras autenticación exitosa en {inc_id}"
+                else:
+                    t_tipo = "Cuenta objetivo (intento fallido)"
+                    t_ctx = f"Cuenta corporativa objetivo de password spraying en {inc_id} (intento fallido)"
+            else:
+                t_tipo = "Cuenta Comprometida"
+                t_ctx = f"Identidad utilizada en actividad maliciosa en {inc_id}"
+
             ioc_records.append(
                 {
-                    "tipo": "Cuenta Comprometida",
+                    "tipo": t_tipo,
                     "valor": u,
-                    "contexto": f"Identidad utilizada en actividad maliciosa en {inc_id}",
+                    "contexto": t_ctx,
                     "incidente": inc_id,
-                    "primer_visto": t_min,
-                    "ultimo_visto": t_max,
+                    "primer_visto": u_events["Timestamp"].min() if not u_events.empty else t_min,
+                    "ultimo_visto": u_events["Timestamp"].max() if not u_events.empty else t_max,
                 }
             )
 
@@ -1086,7 +1105,7 @@ def run_detections(df: pd.DataFrame):
                 }
             )
 
-        # 4. Archivos / Rutas / Artefactos
+        # 4. Archivos / Rutas / Artefactos y Herramientas LOLBins
         files_found = set()
         for _, row in sub_df.iterrows():
             cmd = row["Process_CommandLine"]
@@ -1094,22 +1113,41 @@ def run_detections(df: pd.DataFrame):
 
             # Archivos comprimidos o ejecutables en comandos
             for m in re.finditer(r"([A-Za-z]:\\[^\s\"]+\.(?:exe|ps1|zip|7z|rar|xlsx|docx)|[^\s\"]+\.(?:exe|ps1|zip|7z|aspx))", cmd):
-                files_found.add(m.group(1))
+                raw_f = m.group(1).strip()
+                clean_f = re.sub(r"^(Action|ImagePath)=", "", raw_f)
+                files_found.add(clean_f)
             # Archivos en descripcion de eventos
             for m in re.finditer(r"(Finance\\[^\s]+\.xlsx|Legal\\[^\s]+\.docx)", desc):
-                files_found.add(m.group(1))
+                raw_f = m.group(1).strip()
+                clean_f = re.sub(r"^(Action|ImagePath)=", "", raw_f)
+                files_found.add(clean_f)
+
+        lolbins_set = {"powershell.exe", "cmd.exe", "net.exe", "tar.exe", "7z.exe", "vssadmin.exe"}
 
         for f_path in sorted(list(files_found)):
-            ioc_records.append(
-                {
-                    "tipo": "Archivo/Ruta",
-                    "valor": f_path,
-                    "contexto": f"Artefacto o archivo manipulado en {inc_id}",
-                    "incidente": inc_id,
-                    "primer_visto": t_min,
-                    "ultimo_visto": t_max,
-                }
-            )
+            base_name = f_path.split("\\")[-1].split("/")[-1].lower()
+            if base_name in lolbins_set:
+                ioc_records.append(
+                    {
+                        "tipo": "Herramienta utilizada (LOLBin)",
+                        "valor": f_path,
+                        "contexto": f"Herramienta o binario del sistema/terceros empleado en {inc_id}",
+                        "incidente": inc_id,
+                        "primer_visto": t_min,
+                        "ultimo_visto": t_max,
+                    }
+                )
+            else:
+                ioc_records.append(
+                    {
+                        "tipo": "Archivo/Ruta",
+                        "valor": f_path,
+                        "contexto": f"Artefacto o archivo manipulado en {inc_id}",
+                        "incidente": inc_id,
+                        "primer_visto": t_min,
+                        "ultimo_visto": t_max,
+                    }
+                )
 
         # 5. Tareas Programadas y Servicios
         for _, row in sub_df.iterrows():

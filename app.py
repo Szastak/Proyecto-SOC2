@@ -577,7 +577,7 @@ def main():
                     margin=dict(l=20, r=20, t=50, b=20),
                     showlegend=True,
                 )
-                st.plotly_chart(donut_fig, use_container_width=True)
+                st.plotly_chart(donut_fig, width="stretch")
 
             # Gráfico de Barras: Eventos por Técnica MITRE ATT&CK
             with col_chart_right:
@@ -609,7 +609,7 @@ def main():
                         margin=dict(l=20, r=20, t=50, b=20),
                         coloraxis_showscale=False,
                     )
-                    st.plotly_chart(bar_fig, use_container_width=True)
+                    st.plotly_chart(bar_fig, width="stretch")
                 else:
                     st.info("No hay técnicas MITRE asignadas en los eventos filtrados.")
 
@@ -644,7 +644,7 @@ def main():
                 template="plotly_dark",
                 margin=dict(l=20, r=20, t=50, b=20),
             )
-            st.plotly_chart(heat_fig, use_container_width=True)
+            st.plotly_chart(heat_fig, width="stretch")
 
             # Alerta de analista para eventos subestimados por la fuente
             underestimated_events = df_filtered[
@@ -678,7 +678,7 @@ def main():
                     ]
                     st.dataframe(
                         underestimated_events[available_cols],
-                        use_container_width=True,
+                        width="stretch",
                         hide_index=True,
                     )
             else:
@@ -727,7 +727,7 @@ def main():
                 margin=dict(l=20, r=20, t=50, b=20),
                 legend_title_text="Incidente",
             )
-            st.plotly_chart(scatter_fig, use_container_width=True)
+            st.plotly_chart(scatter_fig, width="stretch")
 
             st.divider()
 
@@ -753,7 +753,7 @@ def main():
                     margin=dict(l=20, r=20, t=50, b=20),
                     yaxis_title="Cantidad de Eventos",
                 )
-                st.plotly_chart(hist_fig, use_container_width=True)
+                st.plotly_chart(hist_fig, width="stretch")
             else:
                 st.info(
                     "No se identificaron eventos maliciosos (Alto/Medio) en el rango temporal o filtros seleccionados."
@@ -836,7 +836,7 @@ def main():
                         ]
                         st.dataframe(
                             df_timeline[cols_valid],
-                            use_container_width=True,
+                            width="stretch",
                             hide_index=True,
                         )
                     else:
@@ -854,7 +854,7 @@ def main():
 
         st.dataframe(
             df_filtered,
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -905,7 +905,7 @@ def main():
 
             st.dataframe(
                 iocs_table,
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
 
@@ -950,7 +950,7 @@ def main():
                 df_enriquecido["User"] == r"CORP\svc_backup"
             ]
             st.metric(
-                "Eventos con Cuenta Señuelo CORP\\svc_backup", len(svc_backup_events)
+                "Eventos con Cuenta de nombre similar (a verificar) CORP\\svc_backup", len(svc_backup_events)
             )
             st.caption(
                 "**Hallazgo forense:** Se documenta la presencia de la identidad `CORP\\svc_backup`, "
@@ -974,7 +974,7 @@ def main():
             valid_anom_cols = [c for c in cols_anom if c in anomalias_df.columns]
             st.dataframe(
                 anomalias_df[valid_anom_cols],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
 
@@ -1025,7 +1025,7 @@ def main():
         generate_pdf_clicked = st.button(
             "📄 Generar Informe Forense PDF",
             type="primary",
-            use_container_width=True,
+            width="stretch",
             key="btn_generate_pdf",
         )
 
@@ -1053,7 +1053,7 @@ def main():
                     file_name=pdf_filename,
                     mime="application/pdf",
                     key="btn_download_pdf",
-                    use_container_width=True,
+                    width="stretch",
                 )
             else:
                 st.warning(
