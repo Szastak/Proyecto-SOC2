@@ -1,6 +1,25 @@
+# Tema de la consola: Claro / Oscuro / Sistema (menu ⋮ -> Settings).
+# Con [theme.light] y [theme.dark] definidos, Streamlit ofrece los tres modos.
 [theme]
-base = "dark"
-primaryColor = "#EF4444"
+font = "sans-serif"
+baseRadius = "medium"
+
+[theme.light]
+primaryColor = "#2563EB"
+backgroundColor = "#F7F8FA"
+secondaryBackgroundColor = "#EEF1F6"
+textColor = "#111827"
+borderColor = "#D9DEE7"
+
+[theme.dark]
+primaryColor = "#60A5FA"
+backgroundColor = "#0B0F19"
+secondaryBackgroundColor = "#111827"
+textColor = "#E5E7EB"
+borderColor = "#1F2937"
+
+[client]
+toolbarMode = "viewer"
 
 [server]
 maxUploadSize = 50

@@ -957,41 +957,41 @@ def run_detections(df: pd.DataFrame):
 
         # Generar titulo y resumen segun tactica y caracteristicas del incidente
         if "T1505.003" in sorted_techs or any("WEB" in h.upper() for h in hosts):
-            titulo = "Compromiso de servidor web por web shell y ejecucion remota"
+            titulo = "Compromiso de servidor web por web shell y ejecución remota"
             resumen = (
-                f"Explotacion de vulnerabilidad web en {', '.join(hosts)} con invocacion de web shell "
-                f"y ejecucion interactiva de comandos desde la identidad del servicio web."
+                f"Explotación de vulnerabilidad web en {', '.join(hosts)} con invocación de web shell "
+                f"y ejecución interactiva de comandos desde la identidad del servicio web."
             )
         elif "Credential Access" in dominant_tactic and len(log_ids) > 20:
             titulo = "Password spraying y compromiso de cuenta privilegiada"
             resumen = (
                 f"Ataque distribuido de password spraying con {len(log_ids)} eventos detectados "
-                f"afectando a {', '.join(hosts)}, culminando en autenticacion exitosa y elevacion de privilegios."
+                f"afectando a {', '.join(hosts)}, que culmina en una autenticación exitosa y una sesión con privilegios sensibles (4672)."
             )
         elif "Lateral Movement" in dominant_tactic or "Credential Access" in dominant_tactic:
-            titulo = "Fuerza bruta RDP, intrusion y movimiento lateral con exfiltracion"
+            titulo = "Fuerza bruta RDP, intrusión y movimiento lateral con exfiltración"
             resumen = (
-                f"Intrusion remota mediante fuerza bruta RDP hacia {', '.join(hosts)}, seguida de "
-                f"reconocimiento interno, desplazamiento lateral y conexion hacia infraestructura externa."
+                f"Intrusión remota mediante fuerza bruta RDP hacia {', '.join(hosts)}, seguida de "
+                f"reconocimiento interno, desplazamiento lateral y conexión hacia infraestructura externa."
             )
         elif "Discovery" in dominant_tactic or "Impact" in dominant_tactic:
             titulo = "Actividad previa a ransomware y borrado de copias shadow"
             resumen = (
-                f"Inspeccion y acceso masivo a archivos confidenciales en {', '.join(hosts)} seguido de "
-                f"ejecucion de comandos de borrado de instantaneas de volumen para impedir recuperacion."
+                f"Inspección y acceso masivo a archivos confidenciales en {', '.join(hosts)}, seguido de "
+                f"ejecución de comandos de borrado de instantáneas de volumen para impedir la recuperación."
             )
         elif "Exfiltration" in dominant_tactic:
-            total_mb = sub_df["bytes_out"].sum() / (1024 * 1024)
-            titulo = "Exfiltracion masiva de documentos confidenciales via proxy"
+            total_mb = sub_df["bytes_out"].sum() / 1_000_000
+            titulo = "Exfiltración masiva de documentos confidenciales vía proxy"
             resumen = (
                 f"Empaquetado y transferencia masiva de archivos protegidos hacia servidor externo "
-                f"a traves de solicitudes HTTP POST acumulando aproximadamente {total_mb:.1f} MB."
+                f"a través de solicitudes HTTP POST que suman aproximadamente {total_mb:.0f} MB."
             )
         elif "Command and Control" in dominant_tactic or "Persistence" in dominant_tactic:
             titulo = "Persistencia mediante tarea programada y servicio con balizamiento C2"
             resumen = (
-                f"Instalacion de mecanismos de persistencia en {', '.join(hosts)} acompanados de "
-                f"balizamiento continuo de canal C2 a intervalos regulares sin desviacion."
+                f"Instalación de mecanismos de persistencia en {', '.join(hosts)}, acompañados de "
+                f"ejecuciones periódicas a intervalos regulares (patrón de beacon C2)."
             )
         else:
             titulo = f"Incidente de seguridad - {dominant_tactic}"
